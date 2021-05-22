@@ -1,0 +1,252 @@
+---
+layout: post
+title:  "Data driven deep Learning for pdes"
+date:   2021-05-14 21:11:03 +0200
+permalink: /posts/dl4pdes_1/
+
+
+---
+
+
+# Introduction
+## Why Deep Learning and PDEs
+
+
+Deep learning has proven to be an invaluable  tool to learn arbitrarly complex functions by mapping the data into  a manifold of much  lower dimension than the original space, encoding semantic variations continuously in the coordinates of this latent space.
+
+If this works with  music and images, it is expected to perform even better with mathematical entities that  live in a continuous and smooth manifold, as it is the case with the solution of PDEs.
+
+
+
+
+<div class="container">
+
+    <div class="row">
+      <div class="col">
+        <img src="/assets/media/Intro_manifold.png">
+        </div>
+        <div class="col">
+        <img src="/assets/media/intro_modes.gif">
+      </div>
+
+    </div>
+
+</div>
+
+# Introduction
+## Example applications
+
+The biggest contribution of DL to PDEs problems relies on the reduction of time complexity.This entails inmediate applications:
+   * Inverse problems and control processes. <a href="https://arxiv.org/abs/2001.07457"><cite style="font-size:15px">Learning to Control PDEs with Differentiable Physics</cite>.</a>
+   * Computer graphics  <a href="https://arxiv.org/abs/1806.02071"><cite style="font-size:15px">Deep Fluids: A Generative Network for Parameterized Fluid Simulations</cite>.</a>
+   * Fast prototyping, assisted engineering. <a href="https://arxiv.org/pdf/1810.08217.pdf"><cite style="font-size:15px">Deep learning methods for Reynolds-averaged Navier–Stokes simulations of airfoil flows</cite>.</a>
+
+Other contributions beside this should be mentioned
+   * Explainability   <a href="https://www.nature.com/articles/s41467-018-07210-0"><cite style="font-size:15px">Deep learning for universal linear embeddings of nonlinear dynamics</cite>.</a>
+   * Data assimilation  <a href="https://www.sciencedirect.com/science/article/pii/S0021999118307125"><cite style="font-size:15px">M. Raissi, P. Perdikaris, G.E. Karniadakis, PINNS</cite>.</a>
+
+
+# Introduction
+## How do we solve PDEs with deep learning
+### Two general approaches
+
+   - **Supervised learning approach**: Sample data from the population of solutions, and make the neural network learn the mapping $NN: parameter \rightarrow solution$.  <a href="https://arxiv.org/abs/2010.08895"><cite style="font-size:15px">Fourier Neural Operator for Parametric Partial Differential Equations</cite>.</a>
+
+   - **Weighted residuals approach**: Reparametrice $ N_{p}(y,\frac{\partial y}{\partial x},...) = 0 $ with a neural network $\hat{y}(x,\theta)$ and minimize the residues of the associated functional along with the BCs. <a href="https://www.sciencedirect.com/science/article/pii/S0021999118307125"><cite style="font-size:15px">M. Raissi, P. Perdikaris, G.E. Karniadakis, PINNS</cite>.</a>
+
+
+
+
+# Learning from data
+## Problem statement
+
+We consider the PDE $P$ with BC as a mapping $\psi$ between function spaces where $X$ is the parameter space and $Y$ the solution space.
+$$P_{X}(y) = 0$$
+
+$F$ and $G$ are the operators that project the data to a discrete space. The symbol $\varphi$ represent the mapping in the discrete space.
+
+<img  src="/assets/media/scheme_operator.jpg">
+
+
+If we work directly in the discretized space, we'll model the mapping with a convolutional neural network by minimizing:
+$$ \underset{\theta}{argmin} \underset{x \sim \mu}{E}(Cost(\varphi_{solver}(x)-\hat{\varphi}(x,\theta))$$
+
+If we work in a function space we'll minimize:
+$$ \underset{\theta}{argmin} \underset{x \sim \mu}{E}(Cost(\psi_{solver}(x)-\hat{\psi}(x,\theta))$$
+
+Both methods work with discrete data , but in the first case , we are learning directly a mapping  in $R^{N_{grid}}$ while in the second case we first project to a function space (fourier transform), we learn the mapping there and transform back to the discretized space.
+
+
+# Learning from data
+## Case study : Evolutive system, Allen Cahn, spinodal decomposition
+
+$$
+\begin{array}{l}
+    \partial_{t}u-M(\Delta u -\frac{1}{\epsilon^{2}}(u^{2}-1)u) = 0 \\
+     u,\nabla u |_{\partial \Omega} \quad periodic \\
+     u(0,x,y) = u_{0}(x,y)\\
+     x,y\in[0,1]
+\end{array}
+$$
+
+
+  Gibs free energy vs phase            |  Initial condition, small fluctuations that trigger the decomposition
+:-------------------------:|:-------------------------:
+<img src="/assets/media/gibbs_potential.jpg" alt="drawing" />  |  <img src="/assets/media/noise.png" alt="drawing"  />
+
+
+# Learning from data
+## Case study : Evolutive system, Allen Cahn, spinodal decomposition
+
+  Simulations samples      |  $ M = 1,\epsilon = 0.01, T = 200 dt$
+:-------------------------:|:-------------------------:
+<img src="/assets/media/sample1.gif"  />  |  <img src="/assets/media/sample2.gif"  />
+<img src="/assets/media/sample3.gif"  />  |  <img src="/assets/media/sample4.gif"  />
+
+
+
+
+# Learning from data
+## Case study : Evolutive system, Allen Cahn, spinodal decomposition
+
+This is an interesting problem to learn beacuse without being chaotic , it exhibits multiple spatial and temporal timescales that must be solved simultaneously to accurattely predict long term behaviour.
+
+We have a extremely fast destabilization at the beggining that is followed by a slow evolution guided by the interface advances. Even if the coalescence stage is generally slow, when two drops are close to each other, the blending is fast, so it must be captured with a sufficiently small time step
+
+
+   time evolution   |  $E(abs(phase))\quad vs \quad time$
+:-------------------------:|:-------------------------:
+<img src="/assets/media/sample_decomp.gif" width = "400"  height = "400"   />  |  <img src="/assets/media/sample_decomp_phase.png"  width = "400" height = "400" />
+
+
+
+# Learning from data
+## Models architecture
+
+   Image-Image CNN   |  Fourier Neural Operator
+:-------------------------:|:-------------------------:
+<img src="/assets/media/unetlike.png"   />  |  <img src="/assets/media/fourier_operator.jpg"  />
+
+
+
+# Learning from data
+## Training
+
+
+The mapping we'll try to learn is $\Psi: u_{T-\Delta t}\rightarrow u_{T} $ with the goal of applying it recurrently to predict evolution times much longer than $\Delta t$. As NNs operate in a different space than the original one, they'll not be constrained by the time integration errors of traditional schemes, so larger prediction times can be used. For training we use large $\Delta t, 6*dt_{solver}$.
+
+
+The objetive is to minimize:
+$$\underset{\theta}{argmin}\underset{u_{0},T}{E}(|u_{T+\Delta t}-\hat{u}_{T+\Delta t}(\theta, u_{T})|^{2})$$
+
+We compute with Fenics 200 simulations with different random initial conditions of $\sigma$ 0.02, we split it in a 140:60 training/validation dataset. For validation we skip the first steps so the noise is diffused and the emergence of patterns can be appreciated.
+
+
+
+
+
+
+
+# Learning from data
+## Results on validation dataset
+
+  FeniCS      |  FNO |  CNN
+:-------------------------:|:-------------------------: |:-------------------------:
+<img src="/assets/media/real3.gif"  />  |  <img src="/assets/media/pred3fno.gif"  /> |  <img src="/assets/media/pred3cnn.gif"   />
+<img src="/assets/media/real12.gif"/>  |  <img src="/assets/media/pred12fno.gif"  />   |  <img src="/assets/media/pred12cnn.gif"  />
+<img src="/assets/media/real13.gif"   />  |  <img src="/assets/media/pred13fno.gif"   />   |  <img src="/assets/media/pred13cnn.gif"  />
+
+
+# Learning from data
+## Models error in time
+
+
+
+
+
+  CNN,FNO error vs time     |  FNO error time
+:-------------------------:|:-------------------------:
+<img src="/assets/media/two_models_time_error.png"   />  |  <img src="/assets/media/time_error.png"   />
+
+
+
+
+# Learning from data
+## Long term accuracy, multiscale approach
+
+<a href="https://arxiv.org/abs/2008.09768"><cite style="font-size:15px">Hierarchical Deep Learning of Multiscale Differential Equation Time-Steppers</cite>.</a>
+
+
+  Approach   |  different $\Delta t$ errors comparison
+:-------------------------:|:-------------------------:
+<img src="/assets/media/multiscale_1.jpg"   />  |  <img src="/assets/media/multiscale_2.jpg"   />
+
+
+# Learning from data
+## FNO phase average comparison
+
+
+  phase quantity vs time     |  2D evolution
+:-------------------------:|:-------------------------:
+<img src="/assets/media/phases_26.png"   />  |  <img src="/assets/media/sim_comparative_t0_10_26.gif"  />
+<img src="/assets/media/phases_38.png"   />  |  <img src="/assets/media/sim_comparative_t0_10_38.gif"   />  
+
+
+# Learning from data
+## Spinal decomposition from noise
+
+<div class="container">
+
+    <div class="row">
+      <div class="col">
+
+        <img src="/assets/media/sim_comparative_t0_0_4.gif"   />  
+        </div>
+    <div class="col">
+       <img src="/assets/media/sim_comparative_t0_0_14.gif"  />  
+      </div>
+        <div class="col">
+       <img src="/assets/media/sim_comparative_t0_0_16.gif"  />  
+      </div>
+
+
+    </div>
+
+</div>
+
+
+
+
+# Learning from data
+## Corrupted input
+
+
+ original     |  downsampled /2 | sampled 25%   | Gaussian noise $\sigma = 1$
+:-------------------------:|:-------------------------: |:-------------------------: |:-------------------------:
+<img src="/assets/media/2_vanilla.gif"   />  | <img src="/assets/media/2_downsampled.gif"   />  | <img src="/assets/media/2_sampled.gif"  />  | <img src="/assets/media/2_corrupted.gif"  />  |
+<img src="/assets/media/14_vanilla.gif"  />  | <img src="/assets/media/14_downsampled.gif"  />  | <img src="/assets/media/14_sampled.gif"  />  | <img src="/assets/media/14_corrupted.gif"   />  |
+
+
+
+
+# Learning from data
+## Multiple scales
+
+
+
+$$2dt$$ fourier network    | $$12dt$$ fourier network
+:-------------------------:|:-------------------------:
+<img src="/assets/media/scale_short.gif"  />   | <img src="/assets/media/scale_long.gif"  />   |
+
+
+
+
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+  <img src="/assets/media/comp_scales.gif"  />  
+
+   </div>
+  </div>
+</div>
