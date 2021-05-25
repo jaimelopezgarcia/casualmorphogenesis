@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Deep Learning for PDEs: Fourier Neural Operator and Phase Field models"
-date:   2021-05-14 21:11:03 +0200
+date:   2021-05-25 21:11:03 +0200
 permalink: /posts/dl4pdes_1/
 
 
