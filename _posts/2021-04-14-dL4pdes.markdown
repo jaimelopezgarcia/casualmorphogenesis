@@ -98,8 +98,8 @@ given by the elongation produced with our thumb, and $$0$$ initial velocity  bec
 </div>
 
 
-To solve numerically this equation we first have to discretize things. If we only mesh the space with some stencil we are left with a system of ODEs $$\dot{x}=f(x)$$SUP of the amplitude of the solution on that node.
-Instead of meshing the space, we can as well discretize the spatial part by expanding $$u$$ in some finite basis $$u = \sum a_{k}(t)\phi_{k}$$, with $$\phi_{k} \in$\{\phi_{1}(x)...\phi_{n}(x)\}$$ $$u = \sum a_{k}(t)\phi_{k}$$, and we'd get another system of ODEs $$\dot{a}=f(a)$$ for the amplitude of the projection onto each basis function. The thing is, once we choose a finite representation of the space , we'll get a system of ordinary differential equations whose solution will be the amplitude of the coefficients of the different basis functions over time SUP.
+To solve numerically this equation we first have to discretize things. If we only mesh the space with some stencil we are left with a system of ODEs $$\dot{x}=f(x)$$ of the amplitude of the solution on that node.
+Instead of meshing the space, we can as well discretize the spatial part by expanding $$u$$ in some finite basis $$u = \sum a_{k}(t)\phi_{k}$$, with $$\phi_{k} \in$\{\phi_{1}(x)...\phi_{n}(x)\}$$ $$u = \sum a_{k}(t)\phi_{k}$$, and we'd get another system of ODEs $$\dot{a}=f(a)$$ for the amplitude of the projection onto each basis function. The thing is, once we choose a finite representation of the space , we'll get a system of ordinary differential equations whose solution will be the amplitude of the coefficients of the different basis functions over time.
 Our goal now is to choose a finite basis $$\{\phi_{1}(x)...\phi{n}(x)\}$$ such that  we can have a very good approximation of our system with the least amount of basis functions.
 
 
@@ -111,7 +111,7 @@ u(x,t) =\sum_{n} sin(n\pi x/L)(A_{n}cos(n \pi ct/L))
 \end{equation}
 
 The *idea* of optimal basis will eventually depend on our specific problem, but being the eigenmodes orthogonal to each other, each of the associated ODE comprising the system will be decoupled from the others,
-if we prefer to analyze  it from a probabilistic standpoint, the elements of this basis are uncorrelated, and can be thought as the principal components_SUP
+if we prefer to analyze  it from a probabilistic standpoint, the elements of this basis are uncorrelated, and can be thought as the principal components.
 
 Now, the projection of the initial shape of the string onto this basis will determine the coefficients $$A_{n}$$, this is how much each harmonic is "stimulated", and this is going to  unambiguously specify the evolution of the system.
 
@@ -147,7 +147,7 @@ In the end, this was accomplished with  a linear transformation that we can find
 this term is going to mix and couple our beloved eigenmodes together, new modes, not considered in the truncated basis will be born from combinations of the original ones, this will be exacerbated the most present
 the effect of the non-linearity is.
 The  trajectories of non linear evolutive PDEs, wont live in a flat manifold being each dimension the amplitude over one of the elements of the basis,  there is no **superposition principle** so we can not   insert linear combinations of our basis $$A_{1}(t)\phi_1(x)+A_{2}\phi_2(x)$$ and expect them to be a solution of the PDE,  the trajectories of the non linear PDE will live in curved manifolds,
-with no general way of finding the non linear transformation that  takes us from our original space to this curved *latent* manifold .SUP( HOPF COLE OR WHATEVER TRANSFORMATION BURGERS)
+with no general way of finding the non linear transformation that  takes us from our original space to this curved *latent* manifold <sup id="fnref:fn3"><a href="#fn:fn3" >3</a></sup>.
 
 Most likely,   the deep learning guy at the end of the room, being too busy trying to come with a strange name for his next paper, wasn't paying attention to any of this. But as soon
 as the key terms *manifold*, *representations*, *non linear transformation*, *unknown change of basis*, are scattered into the air, he'll be on the floor, uncontrollably convulsing with excitement.
@@ -409,7 +409,7 @@ We'll start with a random small perturbation around the 0 metastable state that 
 
 
 
-I find this a simple yet interesting test problem for various reasons. It is very easy to generate a diverse set of learning trajectories by just using white noise as the initial conditions. There is no chaotic behavior<sup id="fnref:fn1"><a href="#fn:fn1" >1</a></sup> yet we have great sensitivity to initial conditions.  It is a stiff problem, this means,  it exhibits multiple spatial and temporal timescales that must be solved simultaneously to accurately predict long term behavior.
+I find this a simple yet interesting test problem for various reasons. It is very easy to generate a diverse set of learning trajectories by just using white noise as the initial conditions. There is no chaotic behavior<sup id="fnref:fn1"><a href="#fn:fn2" >2</a></sup> yet we have great sensitivity to initial conditions.  It is a stiff problem, this means,  it exhibits multiple spatial and temporal timescales that must be solved simultaneously to accurately predict long term behavior.
 
 We have an extremely fast destabilization at the beginning, called *nucleation* that is followed by a slow evolution dictated by the interface between phases. Even if the coalescence stage is generally slow, when two drops are close to each other, they merge very quickly, a process that requires a small enough time step to be correctly captured.
 
@@ -556,7 +556,7 @@ I didn't report it here, but the same experiment with the CNN failed miserably (
 ## Multiple scales
 
 As explained in <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a> and  <a href = "{{page.bib8_url}}">{{page.bib8_tag}}</a> very small steps leads to poor performance on the recurrent integration of the solution. NNs are sloppy learners
-that can not be expected to reach the low tolerances of classical *multi-step schemes*, the solution for long term integration is increasing the $$dt$$ between samples at training time <sup id="fnref:fn2"><a href="#fn:fn2" >2</a></sup>, allowing
+that can not be expected to reach the low tolerances of classical *multi-step schemes*, the solution for long term integration is increasing the $$dt$$ between samples at training time <sup id="fnref:fn3"><a href="#fn:fn3" >3</a></sup>, allowing
 the network to overcome its lack of precision  by sniffing what comes ahead and learning a coordinate transformation where time integration ( implicitly in the network) is easier.
 Nevertheless we might be interested in the solution of intermediate steps, for some real time feedback or if we want to appreciate  every step of the morphing meme of Nicolas Cage after being used
 as initial condition in a reaction diffusion system.
@@ -594,11 +594,16 @@ We can follow <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a> and combine bo
 <h2 id="footnotes">Footnotes</h2>
 <div class="footnotes" >
   <ol>
-    <li id="fn:fn1" >
-      <p>With chaotic trajectories it is harder to understand the possible difficulties the network is experiencing, and there'd be separation of predicted and ground truth trajectories even if the learnt model is perfect </p>
+
+    <li id = "fn:fn1" >
+      <p> There is some special cases with known analytical transformation, such as the <a href = "https://web.math.sinica.edu.tw/bulletin_ns/20171/2017103.pdf"><i> Hopf-Cole Transformation</i></a></p>
     </li>
 
     <li id="fn:fn2" >
+      <p>With chaotic trajectories it is harder to understand the possible difficulties the network is experiencing, and there'd be separation of predicted and ground truth trajectories even if the learnt model is perfect </p>
+    </li>
+
+    <li id="fn:fn3" >
       <p> This has limits, of course, in chaotic systems,  if you exceed its <a href = "https://en.wikipedia.org/wiki/Lyapunov_time"><i>Lyapunov time </i></a>, there'll be a very small correlation, or no correlation at all, between \(u_{t}\) and \(u_{t+\Delta t}\)</p>
     </li>
 
