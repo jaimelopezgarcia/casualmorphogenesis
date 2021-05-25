@@ -117,7 +117,7 @@ Now, the projection of the initial shape of the string onto this basis will dete
 
 <div class = "container container-figure">
 
-<img src="/assets/media/string_plucked.gif">
+<img src="{{ "/assets" | relative_url }}/media/string_plucked.gif">
 
 </div>
 
@@ -154,7 +154,7 @@ as the key terms *manifold*, *representations*, *non linear transformation*, *un
 
 
 <div class = "container container-figure">
-<img src="/assets/media/excited.gif">
+<img src="{{ "/assets" | relative_url }}/media/excited.gif">
 </div>
 
 
@@ -168,10 +168,10 @@ Well, we can not blame him, Deep Learning has proven to be an invaluable  tool t
 
     <div class="row">
       <div class="col">
-        <img src="/assets/media/Intro_manifold.png">
+        <img src="{{ "/assets" | relative_url }}/media/Intro_manifold.png">
         </div>
         <div class="col">
-        <img src="/assets/media/intro_modes.gif">
+        <img src="{{ "/assets" | relative_url }}/media/intro_modes.gif">
       </div>
 
     </div>
@@ -356,7 +356,7 @@ $$F$$ and $$G$$ are the operators that project the data onto a discrete space. T
 
 
 <div class = "container container-figure-with-text">
-<img  src="/assets/media/scheme_operator.jpg">
+<img  src="{{ "/assets" | relative_url }}/media/scheme_operator.jpg">
 <p> figure  <a href="{{ page.bib9_url}}">source</a></p>
 </div>
 
@@ -391,7 +391,7 @@ $$
 
   Gibs free energy vs phase            |  Initial condition, small fluctuations that trigger the decomposition
 :-------------------------:|:-------------------------:
-<img src="/assets/media/gibbs_potential.jpg" alt="drawing" />  |  <img src="/assets/media/noise.png" alt="drawing"  />
+<img src="{{ "/assets" | relative_url }}/media/gibbs_potential.jpg" alt="drawing" />  |  <img src="{{ "/assets" | relative_url }}/media/noise.png" alt="drawing"  />
 
 Let's imagine an isolated bottle full of water, under certain P,T conditions below the critical temperature, both gas and liquid water will coexist, while thermodynamics give us the equilibrium states,
 the dynamics of how we go from one state to another, is modelled by reaction diffusion systems like the Allen Cahn equation.
@@ -404,8 +404,8 @@ We'll start with a random small perturbation around the 0 metastable state that 
 
   Simulations samples      |  $$ M = 1,\epsilon = 0.01, T = 200 dt$$
 :-------------------------:|:-------------------------:
-<img src="/assets/media/sample1.gif"  />  |  <img src="/assets/media/sample2.gif"  />
-<img src="/assets/media/sample3.gif"  />  |  <img src="/assets/media/sample4.gif"  />
+<img src="{{ "/assets" | relative_url }}/media/sample1.gif"  />  |  <img src="{{ "/assets" | relative_url }}/media/sample2.gif"  />
+<img src="{{ "/assets" | relative_url }}/media/sample3.gif"  />  |  <img src="{{ "/assets" | relative_url }}/media/sample4.gif"  />
 
 
 
@@ -417,7 +417,7 @@ We have an extremely fast destabilization at the beginning, called *nucleation* 
 
    time evolution   |  $$E(abs(phase))\quad vs \quad time$$
 :-------------------------:|:-------------------------:
-<img src="/assets/media/sample_decomp.gif" width = "400"  height = "400"   />  |  <img src="/assets/media/sample_decomp_phase.png"  width = "400" height = "400" />
+<img src="{{ "/assets" | relative_url }}/media/sample_decomp.gif" width = "400"  height = "400"   />  |  <img src="{{ "/assets" | relative_url }}/media/sample_decomp_phase.png"  width = "400" height = "400" />
 
 
 
@@ -429,7 +429,7 @@ problems. The typical networks used in these problems  are some variant of the <
 
    Image-Image CNN   |  Fourier Neural Operator
 :-------------------------:|:-------------------------:
-<img src="/assets/media/unetlike.png"   />  |  <img src="/assets/media/fourier_operator.jpg"  />
+<img src="{{ "/assets" | relative_url }}/media/unetlike.png"   />  |  <img src="{{ "/assets" | relative_url }}/media/fourier_operator.jpg"  />
 
 
 While this is more of a conjecture of my own and it is not properly tested (as far as I know), I think implementing an aggressive bottleneck compression as the ones used in semantic segmentation is not necessarily  beneficial.
@@ -472,9 +472,9 @@ when it successfully reproduced the validation trajectories.
 
   FeniCS      |  FNO |  CNN
 :-------------------------:|:-------------------------: |:-------------------------:
-<img src="/assets/media/real3.gif"  />  |  <img src="/assets/media/pred3fno.gif"  /> |  <img src="/assets/media/pred3cnn.gif"   />
-<img src="/assets/media/real12.gif"/>  |  <img src="/assets/media/pred12fno.gif"  />   |  <img src="/assets/media/pred12cnn.gif"  />
-<img src="/assets/media/real13.gif"   />  |  <img src="/assets/media/pred13fno.gif"   />   |  <img src="/assets/media/pred13cnn.gif"  />
+<img src="{{ "/assets" | relative_url }}/media/real3.gif"  />  |  <img src="{{ "/assets" | relative_url }}/media/pred3fno.gif"  /> |  <img src="{{ "/assets" | relative_url }}/media/pred3cnn.gif"   />
+<img src="{{ "/assets" | relative_url }}/media/real12.gif"/>  |  <img src="{{ "/assets" | relative_url }}/media/pred12fno.gif"  />   |  <img src="{{ "/assets" | relative_url }}/media/pred12cnn.gif"  />
+<img src="{{ "/assets" | relative_url }}/media/real13.gif"   />  |  <img src="{{ "/assets" | relative_url }}/media/pred13fno.gif"   />   |  <img src="{{ "/assets" | relative_url }}/media/pred13cnn.gif"  />
 
 
 ### Errors evolution in time
@@ -488,7 +488,7 @@ them from accumulating error.
 
   CNN,FNO error vs time     |  FNO error time
 :-------------------------:|:-------------------------:
-<img src="/assets/media/two_models_time_error.png"   />  |  <img src="/assets/media/time_error.png"   />
+<img src="{{ "/assets" | relative_url }}/media/two_models_time_error.png"   />  |  <img src="{{ "/assets" | relative_url }}/media/time_error.png"   />
 
 A key feature of both networks needed to obtain long term stability was the use of *batch normalization*, even if two twin networks, one with batch norm, and the other without,
  achieved the same next error prediction, the one without normalization exploded when applied recurrently.
@@ -504,8 +504,8 @@ In the graphs below  the pred vs real plots of the absolute mean phase $$E(abs(U
 
   phase quantity vs time     |  2D evolution
 :-------------------------:|:-------------------------:
-<img src="/assets/media/phases_26.png"   />  |  <img src="/assets/media/sim_comparative_t0_10_26.gif"  />
-<img src="/assets/media/phases_38.png"   />  |  <img src="/assets/media/sim_comparative_t0_10_38.gif"   />  
+<img src="{{ "/assets" | relative_url }}/media/phases_26.png"   />  |  <img src="{{ "/assets" | relative_url }}/media/sim_comparative_t0_10_26.gif"  />
+<img src="{{ "/assets" | relative_url }}/media/phases_38.png"   />  |  <img src="{{ "/assets" | relative_url }}/media/sim_comparative_t0_10_38.gif"   />  
 
 
 ### Nucleation stage
@@ -520,13 +520,13 @@ fast initial dynamics, while the projection onto the Fourier modes  space is ver
     <div class="row">
       <div class="col">
 
-        <img src="/assets/media/sim_comparative_t0_0_4.gif"   />  
+        <img src="{{ "/assets" | relative_url }}/media/sim_comparative_t0_0_4.gif"   />  
         </div>
     <div class="col">
-       <img src="/assets/media/sim_comparative_t0_0_14.gif"  />  
+       <img src="{{ "/assets" | relative_url }}/media/sim_comparative_t0_0_14.gif"  />  
       </div>
         <div class="col">
-       <img src="/assets/media/sim_comparative_t0_0_16.gif"  />  
+       <img src="{{ "/assets" | relative_url }}/media/sim_comparative_t0_0_16.gif"  />  
       </div>
 
 
@@ -545,8 +545,8 @@ One of the great features of learning operators between functional spaces, is th
 
  original     |  downsampled /2 | sampled 25%   | Gaussian noise $$\sigma = 1$$
 :-------------------------:|:-------------------------: |:-------------------------: |:-------------------------:
-<img src="/assets/media/2_vanilla.gif"   />  | <img src="/assets/media/2_downsampled.gif"   />  | <img src="/assets/media/2_sampled.gif"  />  | <img src="/assets/media/2_corrupted.gif"  />  |
-<img src="/assets/media/14_vanilla.gif"  />  | <img src="/assets/media/14_downsampled.gif"  />  | <img src="/assets/media/14_sampled.gif"  />  | <img src="/assets/media/14_corrupted.gif"   />  |
+<img src="{{ "/assets" | relative_url }}/media/2_vanilla.gif"   />  | <img src="{{ "/assets" | relative_url }}/media/2_downsampled.gif"   />  | <img src="{{ "/assets" | relative_url }}/media/2_sampled.gif"  />  | <img src="{{ "/assets" | relative_url }}/media/2_corrupted.gif"  />  |
+<img src="{{ "/assets" | relative_url }}/media/14_vanilla.gif"  />  | <img src="{{ "/assets" | relative_url }}/media/14_downsampled.gif"  />  | <img src="{{ "/assets" | relative_url }}/media/14_sampled.gif"  />  | <img src="{{ "/assets" | relative_url }}/media/14_corrupted.gif"   />  |
 
 This is specially useful if we are feeding the surrogate model with data sampled from sensors or corrupted with noise. If we were operating with the original equation, to reproduce the dynamics we should
 introduce a regularizing preprocessing step, such as interpolation or gaussian smoothing, here it comes in the pack.
@@ -566,7 +566,7 @@ as initial condition in a reaction diffusion system.
 
   Approach   |  different $$\Delta t$$ errors comparison
 :-------------------------:|:-------------------------:
-<img src="/assets/media/multiscale_1.jpg"   />  |  <img src="/assets/media/multiscale_2.jpg"   />
+<img src="{{ "/assets" | relative_url }}/media/multiscale_1.jpg"   />  |  <img src="{{ "/assets" | relative_url }}/media/multiscale_2.jpg"   />
 
 
 
@@ -574,7 +574,7 @@ as initial condition in a reaction diffusion system.
 
 $$2dt$$ fourier network    | $$12dt$$ fourier network
 :-------------------------:|:-------------------------:
-<img src="/assets/media/scale_short.gif"  />   | <img src="/assets/media/scale_long.gif"  />   |
+<img src="{{ "/assets" | relative_url }}/media/scale_short.gif"  />   | <img src="{{ "/assets" | relative_url }}/media/scale_long.gif"  />   |
 
 The evolution on the left is from a network trained on smaller timesteps , even though the big step network also misses some high frequency details( not so manifest in the training dataset, but essential
 to make Nick Cage such a trademark of great acting), doesnt grow the artifacts that the small-step network present in the long term.
@@ -583,7 +583,7 @@ We can follow <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a> and combine bo
 
 
 <div class = "container container-figure-with-text" style = "width 80%">
-  <img src="/assets/media/comp_scales.gif"  />  
+  <img src="{{ "/assets" | relative_url }}/media/comp_scales.gif"  />  
 <p>Some jumps are  present when we switch to the big step network checkpoints, that could be corrected by introducing an intermediate time scale in between.</p>
 </div>
 
