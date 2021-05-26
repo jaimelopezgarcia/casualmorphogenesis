@@ -99,8 +99,8 @@ given by the elongation produced with our thumb, and $$0$$ initial velocity  bec
 
 
 To solve numerically this equation we first have to discretize things. If we only mesh the space with some stencil we are left with a system of ODEs $$\dot{x}=f(x)$$ of the amplitude of the solution on that node.
-Instead of meshing the space, we can as well discretize the spatial part by expanding $$u$$ in some finite basis $$u = \sum a_{k}(t)\phi_{k}$$, with $$\phi_{k} \in$\{\phi_{1}(x)...\phi_{n}(x)\}$$ $$u = \sum a_{k}(t)\phi_{k}$$, and we'd get another system of ODEs $$\dot{a}=f(a)$$ for the amplitude of the projection onto each basis function. The thing is, once we choose a finite representation of the space , we'll get a system of ordinary differential equations whose solution will be the amplitude of the coefficients of the different basis functions over time.
-Our goal now is to choose a finite basis $$\{\phi_{1}(x)...\phi{n}(x)\}$$ such that  we can have a very good approximation of our system with the least amount of basis functions.
+Instead of meshing the space, we can as well discretize the spatial part by expanding $$u$$ in some finite basis $$u = \sum a_{k}(t)\phi_{k}$$, with $$\phi_{k} \in\{\phi_{1}(x)...\phi_{n}(x)\}$$ $$u = \sum a_{k}(t)\phi_{k}$$, and we'd get another system of ODEs $$\dot{a}=f(a)$$ for the amplitude of the projection onto each basis function. The thing is, once we choose a finite representation of the space , we'll get a system of ordinary differential equations whose solution will be the amplitude of the coefficients of the different basis functions over time.
+Our goal now is to choose a finite basis $$\{\phi_{1}(x)...\phi_{n}(x)\}$$ such that  we can have a very good approximation of our system with the least amount of basis functions.
 
 
 For linear systems such as the wave equation we can find this basis analytically ,by applying separation of variables and finding the eigenmodes of the associated Sturm-Liouville equation.
@@ -332,21 +332,21 @@ We consider the PDE $$P$$ with BC as a mapping $$\psi$$ between function spaces 
 $$P_{X}(y) = 0$$
 </div>
 
-In order to learn the mapping, $$X\rightarrow y$$ (X might be the initial conditions , boundary conditions, constitutive parameters... whatever), we must sampleSUP $$N$$  (X,Y) pairs with a traditional
+In order to learn the mapping, $$X\rightarrow y$$ (X might be the initial conditions , boundary conditions, constitutive parameters... whatever), we must sample $$N$$  (X,Y) pairs with a traditional
 solver and feed them to a model.
 
 Nice and extended explanation <a href="{{ page.bib9_url}}">here</a>.
 
 
 ### The approach
-The most obvious model to learn this mapping is a *Convolutional Neural Network*, because it exploits the coherence and traslational invariance present in the solutions of PDEs.
+The most obvious model to learn this mapping is a *Convolutional Neural Network*, because it exploits the coherence and translational invariance present in the solutions of PDEs.
 
 The problem is, remember how we were talking in the example of the wave equation of a basis set of functions $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$ to represent our solution?
 with the CNN approach, we'll learn a mapping between the discrete spaces where $$X$$ and $$Y$$ will be represented, but this mapping will be completely mesh dependent,
 what if we first project $$X$$ into a known basis of our choice  $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$, we learn the mapping there and project back to $$Y$$, so if the discrete representation of $$X$$ changes,
 by changing the resolution of the snapshots for instance, the error committed will only be the projection error onto  $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$, that shouldn't be too great if  we use a robust basis and the discrete $$X$$ representation still contains enough information to characterize an univocal mapping.
 
- Not only that, we now that some basis, such as Fourier Series expansions, are very well suited to sparsely represent PDEs solutions, so it should be more appropiate  to  start from the frequency domain  rather than the  space of CNN transformations.
+ Not only that, we now that some basis, such as Fourier Series expansions, are very well suited to sparsely represent PDEs solutions, so it should be more appropriate  to  start from the frequency domain  rather than the  space of CNN transformations.
 
 This clever approach was introduced in , as a new neural network architecture, coined as **Neural operator**, in particular when the frequency representation space is used, **Fourier Neural Operator** or **FNO**.
 
@@ -446,7 +446,7 @@ which is needed besides, to enable  the network to implement boundary conditions
 ## Training and evaluation
 
 
-The mapping we'll try to learn is $$\Psi: u_{T-\Delta t}\rightarrow u_{T} $$ aiming to later apply it recurrently to predict times much longer than  $$\Delta t$$, such as in <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>. Beacuse NNs operate in a different space than the original one, they'll not be constrained by the time integration errors of traditional schemes <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>, so larger prediction times can (and must) be used for long term prediction.
+The mapping we'll try to learn is $$\Psi: u_{T-\Delta t}\rightarrow u_{T} $$ aiming to later apply it recurrently to predict times much longer than  $$\Delta t$$, such as in <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>. Because NNs operate in a different space than the original one, they'll not be constrained by the time integration errors of traditional schemes <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>, so larger prediction times can (and must) be used for long term prediction.
 
 The loss function to minimize, the same used in <a href = "{{page.bib1_url}}">{{page.bib1_tag}}</a> and <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>, will be simply the square error of the prediction one step ahead and the ground truth snapshot.
 
@@ -455,7 +455,7 @@ $$\underset{\theta}{argmin}\underset{u_{0},T}{E}(|u_{T+\Delta t}-\hat{u}_{T+\Del
 
 We compute with Fenics 200 simulations with different random initial conditions sampled from $$N(0,\sigma = 0.2)$$, we split them in a 140:60 training/validation dataset. For validation we skip the first steps so the initial noise is diffused and the emergence of patterns can be appreciated. An Implicit Euler Scheme was used to compute the solution,  the first steps of the spinal decomposition required a smaller time step of $$dt/10$$.
 
-For training we use $$\Delta t =  6*dt_{solver}$$.
+For training we use $$\Delta t =  6dt_{solver}$$.
 
 
 
@@ -511,7 +511,7 @@ In the graphs below  the pred vs real plots of the absolute mean phase $$E(abs(U
 ### Nucleation stage
 
 Even if the initial nucleating phase was very short and consequently under-represented in the training dataset, the network, (which was trained with $$dt$$ 60 times bigger than
-the ones needed for the Implicit Euler Scheme used in FeniCs to converge),  surprisingly (magically even), it  captures with fidelity most of the spinal decomposition from the initial random noise.
+the ones needed for the Implicit Euler Scheme used in FeniCS to converge),  surprisingly (magically even), it  captures with fidelity most of the spinal decomposition from the initial random noise.
 There are some artifacts at the beginning, this is most likely because it must be  mainly the  convolutional part of the network the one providing the evolution of this high frequency
 fast initial dynamics, while the projection onto the Fourier modes  space is very small. Once the patterns emerge the projection on the Fourier Layers starts to dominate and smoothens the evolution again.
 
@@ -577,7 +577,7 @@ $$2dt$$ fourier network    | $$12dt$$ fourier network
 <img src="{{ "/assets" | relative_url }}/media/scale_short.gif"  />   | <img src="{{ "/assets" | relative_url }}/media/scale_long.gif"  />   |
 
 The evolution on the left is from a network trained on smaller timesteps , even though the big step network also misses some high frequency details( not so manifest in the training dataset, but essential
-to make Nick Cage such a trademark of great acting), doesnt grow the artifacts that the small-step network present in the long term.
+to make Nick Cage such a trademark of great acting), doesn't grow the artifacts that the small-step network present in the long term.
 
 We can follow <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a> and combine both time scales to achieve a fine evolution with long term accuracy
 
@@ -600,7 +600,7 @@ We can follow <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a> and combine bo
     </li>
 
     <li id="fn:fn2" >
-      <p>With chaotic trajectories it is harder to understand the possible difficulties the network is experiencing, and there'd be separation of predicted and ground truth trajectories even if the learnt model is perfect </p>
+      <p>With chaotic trajectories it is harder to understand the possible difficulties the network is experiencing, and there'll be separation of predicted and ground truth trajectories even the model learnt the dynamics perfectly. </p>
     </li>
 
     <li id="fn:fn3" >
