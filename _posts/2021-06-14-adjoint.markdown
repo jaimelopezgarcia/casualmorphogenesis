@@ -1,0 +1,1123 @@
+---
+layout: post
+title:  "Adjoint method and its different flavors, from optimal control to Odenets"
+date:   2021-06-15 21:11:03 +0200
+permalink: /posts/adjoint/
+
+---
+
+
+# Introduction
+
+# Adjoint Method
+
+Pontryagin, Lev S., et al. "The mathematical theory of optimal processes, translated by KN Trirogoff." New York (1962).
+[https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf](https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf)
+
+
+Broadly speaking, the adjoint method is a method to efficiently caculate gradients of scalar functions in constrained optimization problems with many parameters. Fitting the parameters of evolutive system, fitting a neural net to some data, optimal control, inverse problems, all use the same mathematical backbone to calculate, the gradients of the systems, some times is called a "trick", in deep learning and computer science is called backpropagation or backward differentiation, in control applications is sometimes called  coestate, in optimization the adjoint equation is usually employed...
+So comming from some specific background, it might be hard to understand how all this apparently different methods, share the same general formulation. Besides, there are some very arcane explanations around, and most of the explanations are ussually fit to the specific application at hand, and when faced a different problem, even if the difference in the formulation is just cosmetic, is hard to identify is the same thing.  
+with  It is intimately related to the very basic concept of lagrange multipler and as most things in life can be reformulated as a constrained optimization problem, it is no wonder why this method appeared paralelly in different disciplines with different names.
+
+
+# Motivation
+
+When we have an   system that depends on some parameters $$p$$ and some input $$x$$, that produces some output $$u$$. Evaluating that model requires is called the **forward problem**, if our system is the ode describing the movement of a damped pendulum , the forward pass is just  plugging some forcing function on the rhs, or a "kick" and integrate the equations to evaluate the output u(t). If our system is a feed forward neural net the forward pass is just feeding some data propagate it  and getting some output $$y$$. But many times we need to go in the other direction, this is, solving the inverse problem that answers the question, "which are the inputs/parameters that generate this output" , this usually involves solving some constrained optimization problem and propagating information in the backward direction, which is the **backward problem** (forward backward might not be so intuitive with non evolutive systems but the method is the same).
+
+
+
+
+
+
+
+
+
+<div class = "container">
+
+<h3> Example problems that adhere to this description</h3>
+<table>
+    <tr>
+        <th width="33%"> Feedforward NN </th>
+        <th width="33%">Optimal control, LQR controller</th>
+        <th width="33%"> Seismic tomography </th>
+
+    </tr>
+
+    <tr>
+      <td width="33%">
+
+
+      <div>
+      \begin{array}{lc}
+      \mbox{J}: \underset{p}{\mbox{minimize}} & \sum(x_{Data}-\hat{x}(x_{input},p))^{2}  \\
+      \end{array}
+      \begin{array}{lm}
+      \mbox{G}: &   \begin{cases}
+            \hat{x} = \sigma(Wx_{k})  \\
+            x_{k} = \sigma(W_{k}x_{k-1}) \\
+            \vdots \\
+            x_{2} = \sigma(W_{2}x_{1})\\
+            x_{1} = \sigma(W_{1}x_{input}) \\
+         \end{cases} \\
+      \end{array}
+      </div>
+
+
+       </td>
+
+
+
+      <td width="33%">
+
+      <div>
+      \begin{array}{lc}
+      \mbox{J}: \int_{0}^{tf}1/2(x^{*}Qx+u^{*}Ru)d\tau \\
+      \end{array}
+
+      \begin{array}{lm}
+      \mbox{G}: & \dot{x} = Ax+Bu
+      \end{array}
+      </div>
+
+
+      </td>
+      <td width="33%">
+
+
+
+      <div>
+      \begin{array}{lc}
+      \mbox{J}: \sum_{sensor data} ||x_{jreading,\tau}-x_{j}(t=\tau)||^{2}   \\
+      \end{array}
+
+      \begin{array}{lm}
+      \mbox{G}: & \ddot{x} = A(m)x+b(m) \\
+      I.C & B.C
+      \end{array}
+      </div>
+
+
+
+      </td>
+    </tr>
+
+
+
+</table>
+
+
+
+
+Let's ilustrate  this with some specific example
+
+<div>
+\begin{array}{l}
+
+\underset{p}{argmin}J(p) = \sum_{D}(u_{ijD}-u(p,x_{i}, y{j})) \\
+subject \quad to \quad g(x,y,p) = \Delta u-\sigma u - C\sum p_{ij}\delta(x_{i},y_{j}) = 0\\
+B.C
+
+\end{array}
+
+
+
+Let's work with the discretized problem to make it simpler
+
+
+\begin{array}{l}
+\underset{p}{argmin}J(p) = \sum_{D}(u_{ijD}-u(p,x_{i}, y{j})) \\
+subject \quad to \quad Au = Cp
+B.C
+\end{array}
+</div>
+
+<div>
+where $$p$$ is an array with zeros in all entries where there is no injection.
+
+To get our target temperature distribution, we have to calculate the gradients of the cost function $$J(p)$$ with respect to the parameters, $$d_{p} J$$.
+
+Applying the chain rule we get $$d_{p} J = \partial_{u} J\partial_{p}u + \partial_{p}J$$, here the term $$\partial_{p}u$$ is the nasty bit, which enforces the constraint as it is implicitely present in the constrain equation. Let's have in mind that $$\partial_{p}u$$  has  $$N_{u}xN_{p}$$ elements where $$N_{p}$$ is the number of controls and $$N_{u}$$ is the number of nodes in our mesh.
+
+Trying to find $$d_{p}J$$ naively by finite differences would require solving $$N_{p}$$ times $$g(x,y,p)$$, not cool.
+Trying to solve numerically $$\partial_{p}u$$ in $$g$$ is not much better, we would have to solve $$N_{p}$$ $$A\partial_{p_{ij}}u = Cp_{ij}$$ (ij is the label of the ij controller) systems, not cool.
+
+To get around this, the key realization here is that our objective function is just an scalar function, and at every $$p$$ point, this $$J$$ function only care about $$u$$ directions that make it change, this is $$\partial_{u}J$$. This can be made obvious with some example.
+
+Let's imagine in the last problem that we only care about controlling the temperature at  some specific $$u(x_{k},y_{m})$$ node,
+\underset{p}{argmin}J(p) = (u_{kmD}-u(p,x_{k}, y{m})**2 \\
+subject \quad to \quad Au = Cp
+B.C
+\end{array}
+
+
+</div>
+
+It is obvious here that we only need to solve the $A\partial_{p}u_{km}=Cp$$ system, because we only care about the $$\partial{p}u_{km}$$ term.
+
+But there is nothing special about the $$u_{km}$$ direction, if there are more $$u's$$ in the cost function, the direction we are interested about will be a direction with non zero components in different $$u's$$ but a single direction anyway.
+
+So how can we work with this single direction instead of all the $$\partial_{p}u$$ beast?, that's where the adjoint comes front.
+The adjoint $$B$$ of a linear operator is another operator that satisfy $$<Bv,w> = <v,Aw>$$, we are so used to apply this in the context of matrix algebra, that is easy to
+miss what is behind, when dealing with matrix operators,  the inner product is $$v^{T}Aw$$ , we can calculate first Aw, or we can move A to the life like (A^{T}v)^{T}w, here we are using the adjoint matrix of A, which is just the traspose, rather than the matrix specific application, is better to have the $$<Bv,w> = <v,Aw>$$ idea in mind, because it is much more general,
+and if we are dealing with operators on functional spaces for example, we can think of the adjoint operator as the "generalization " of the traspose matrix in linear algebra ( the adjoint op when dealing with functional operators, can be found using integration by parts).
+
+Having this in mind,
+
+<div>
+\begin{array}{l}
+dJ(p) = <\partial_{u}J, \partial_{p}u \Delta p> = <\partial_{u}J, \partial_{u}g^{-1}\partial_{p}g \Delta p>
+</div>
+
+By definition $$\partial_{p}J$$ will be the thing on the left in the dJ(p) = <\partial_{p}J, \Delta p> expression, so we have to move the $$\partial_{u}g^{-1}\partial_{p}g$$ operator to the left bracket,
+<div>
+\begin{array}{l}
+dJ(p) = <\partial_{u}J, \partial_{u}g^{-1}\partial_{p}g \Delta p> = <( \partial_{u}g^{-1}\partial_{p}g)^{T} \partial_{u}J,  \Delta p>
+\end{array}
+</div>
+
+The thing on the left is our variable of interest, $$\partial_{p}J$$, but expressed like that, it doesn't look that we made any advance, but there is in fact a linear system in disguise there, of only $$N_{u}$$ unknowns, instead of the $$\partial_{u}g\partial_{p}u = -\partial_{p}g$$ system with $$N_{u}xN_{p}$$ unkowns, this system is unfolded by doing the following.
+<div>
+\begin{array}{l}
+\partial_{u}J^{T}\partial_{u}g^{-1} = \lambda^{T} \\
+\partial_{u}J = \partial_{u}g^{T}\lambda
+\end{array}
+</div>
+
+Wich is the adjoint system.
+
+Once we find the adjoint $$\lambda$$ , $$\partial_{p}J$$ is just calculated with $$<\partial_{p}g^{T}\lambda,  \Delta p> = <\partial_{p}J,\Delta p>$$, $$\partial_{p}J = \lambda^{T}\partial_{p}g $$.
+
+Of course there are more mundane approaches to calculate the adjoint developped in the context of specific applications, explained in examples
+
+
+## Putting it all together
+
+Being practical here, let's summarize the problem and the application of the adjoint method.
+
+We have some system (dynamical system, neural network, stationary pde ...) with state $u$ dependent on some parameters $p$, whose response to an external input is expressed implicitely a a function $g(u,p)= 0 $. We want to minimize some scalar function of the state of the system $J(u(p),p)$ respect to $$p$$. When the number of $$p$$ is large, the naive calculation of $\partial_{p}u$ is intractable, so we formulate another additional system, the adjoint system, that help us to calculate $$d{p}J$$ by only taking into account the direction of change of $$u$$ that $$J$$, is most sensitive to, $$\partial_{u}J$$.
+
+Let's assume for simplicity that $$u(p)$$ and $$p$$ are arrays of dimension $$N_{u} \quad N_{p} $$ and $$J$$ doesn't depends explicitely on p ( if it does it is just adding the $$\partial_{p}J$$ )
+
+<div>
+
+\begin{array}{l}
+
+\underset{p}{argmin}J(p) \\
+subject \quad to \quad g(u,p) = 0\\
+\end{array}
+
+</div>
+
+Finding the adjoint equation, the system we have to solve becomes
+
+<div>
+
+\begin{array}{l}
+
+\underset{p}{argmin}J(p) \\
+
+subject \quad to \quad \partial_{u}J(u(p),p) = \partial_{u}g^{T}(u,p)\lambda \\
+subject \quad to \quad g(u,p) = 0
+\end{array}
+
+
+
+where $$\lambda$$ is an array of the same dimension as $$u$$
+
+Once we solve this system, $$d_{p}J$$ is just $$-\lambda^{T}\partial_{p}g$$.
+
+To solve the adjoint system we first have to solve the forward system, once we get the value of $$u$$, for some $$p$$, we can get $$\partial_{u}g^{T}(u,p)$$ and $$\partial_{u}J$$, with this, we can solve the adjoint system.
+</div>
+
+In the next sections we'll formulate the specific adjoint system we get for systems of different structure, with notable examples of each one, $$u$$ and $$p$$ are vectors that obey some general non linear equation $$g(u,p)= 0$$,(discretized spatial pde, present example), evolutive discrete systems, where $$u_{k} = f(u_{k-1},p)$$ (feedforward NN, discretized Ode), time continuous   $$u(t,p)$$ evaluated on a continuous trajectory ( optimal control), time continuous $$u(t,p)$$ evaluated on discrete datapoints ( Odenet, Fitting Ode parameters).
+
+
+
+## All systems
+
+The general problem we will be solving is finding the parameters $$P$$ that minimize a function/functional $$J$$ of the state $$X$$, subject to a state equation $$G$$
+
+\begin{equation}
+    J:X \times P \rightarrow \Re
+\end{equation}
+
+\begin{equation}
+     G:X \times P \rightarrow X
+\end{equation}
+
+Where X and P might be scalars, vectors, time dependent functions...
+
+
+
+<div>
+\begin{array}{l}
+     t_{0} = 0 \rightarrow \mbox{initial time} \\
+     T_{f} = T \rightarrow \mbox{final_time}\\
+     \quad \tau = T-t \\
+\end{array}
+
+\begin{equation}
+    J:X \times P \rightarrow \Re
+\end{equation}
+
+\begin{equation}
+     G:X \times P \rightarrow X
+\end{equation}
+</div>
+
+
+<div class = "container">
+
+<h3> Discrete state</h3>
+<table>
+    <tr>
+        <th width="10%"> $$u$$ </th>
+        <th width="45%">$$\Re^{N_{u}}$$ e.g Discretized spatial PDE</th>
+        <th width="45%">$$\Re^{N_{t}}\times\Re^{N_{u_{k}}}$$ e.g Feed forward NN, discretized Odes </th>
+
+    </tr>
+
+    <tr>
+      <td width="10%"> $$J$$ </td>
+      <td width="45%">$$J(u(p),p)$$</td>
+      <td width="45%">$$J(u_{1},...,u_{T},p)$$</td>
+    </tr>
+
+    <tr>
+      <td width="10%">Forward system</td>
+      <td width="45%"> $$g(u,p) = 0$$ </td>
+      <td width="45%">
+
+        \begin{array}{l}
+            g(u_{T},u_{T-1},p) = 0  \\
+            g(u_{T-1},u_{T-2},p) = 0 \\
+            \vdots \\
+            g(u_{2},u_{1},p) = 0 \\
+            g(u_{1},u_{0},p) = 0 \\
+            g(u_{0},p) = 0
+
+            \end{array}
+
+          </td>
+    </tr>
+
+    <tr>
+      <td width="10%">Adjoint/backward system</td>
+      <td width="45%">$$\partial_{u}J(u(p),p) = \partial_{u}g^{T}(u,p)\lambda$$</td>
+      <td width="45%">
+
+        \begin{array}{l}
+              \partial_{u}J+\lambda_{T}\partial_{u_{T}}g_{T} = 0 \\
+              \lambda_{T}\partial_{u_{T-1}}g_{T}+\lambda_{T-1}\partial_{u_{T-1}}g_{T-1} =0 \\
+              \vdots \\
+              \lambda_{1}\partial_{u_{0}}g_{1}+\lambda_{0}\partial_{u_{0}}g_{0} = 0
+
+      \end{array}
+    </td>
+    </tr>
+
+
+    <tr>
+      <td width="10%">$$d_{p}J$$</td>
+      <td width="45%"> $$d_{p}J = -\lambda^{T}\partial_{p}g$$ </td>
+      <td width="45%">
+        \begin{array}{l}
+              d_{p} J_{aug} = \partial_{p} J + \\
+              \lambda_{T}\partial_{p}g_{T}+\lambda_{T-1}\partial_{p}g_{T-1}+\ldots + \\
+              \lambda_{1}\partial_{p}g_{1}+ \\
+              \lambda_{0}\partial_{p}g_{0} \\
+      \end{array}
+    </td>
+    </tr>
+
+
+</table>
+
+
+
+<h3> Continous state </h3>
+<table>
+    <tr>
+        <th width="10%"> $$u$$ </th>
+        <th width="45%">$$u(t,p)$$ </th>
+        <th width="45%">$$u(t,p)$$  </th>
+
+    </tr>
+
+    <tr>
+      <td width="10%"> $$J$$ </td>
+      <td width="45%">$$ J(u(t),p) = \int_{0}^{T} f(u(t),p) \,dt$$ eg. LQR controller, Kalman Filter </td>
+      <td width="45%">$$J(x,p) = \sum_{i}^{{Ndata}}f(x_{data_{i}},\hat{x_{i}},p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{data_{i}},\hat{x_{i}},p) \delta(t_{i}) dt$$ eg. Fitting Ode params, Odenet </td>
+    </tr>
+
+    <tr>
+      <td width="10%">Forward system</td>
+      <td width="45%">
+        \begin{array}{l}
+
+            g(\dot{x},x,p) = 0  \\
+            g_{0}(x_{0},p) = 0
+
+      \end{array} </td>
+      <td width="45%">
+
+        \begin{array}{l}
+            g(\dot{x},x,p) = 0  \\
+            g_{0}(x_{0},p) = 0
+
+        \end{array}
+
+          </td>
+    </tr>
+
+    <tr>
+      <td width="10%">Adjoint/backward system</td>
+      <td width="45%">
+
+        \begin{array}{l}
+           \dot{\lambda(\tau)}\partial_{\dot{u}}g - \lambda(\tau)\dot{\partial_{\dot{u}}}g + \lambda(\tau)\partial_{u}g = -\partial_{u}f  \\
+           \lambda(\tau = 0) = 0 \\
+            \mu=\lambda\partial_{\dot{u}}g\partial_{u}g_{0}^{-1}
+      \end{array}
+
+    </td>
+      <td width="45%">
+
+        \begin{array}{l}
+            \dot{\lambda(\tau)}\partial_{\dot{x}}g - \lambda(\tau)\dot{\partial_{\dot{x}}}g + \lambda(\tau)\partial_{x}g = 0  \\
+             \lambda(\tau_{i}) = -\partial_{x}f|_{\tau_{i}} \\
+              \mu=\lambda\partial_{\dot{x}}g\partial_{x}g_{0}^{-1}
+        \end{array}
+
+    </td>
+    </tr>
+
+
+    <tr>
+      <td width="10%">$$d_{p}J$$</td>
+      <td width="45%">
+        \begin{array}{l}
+
+       d_{p}J = \int_{0}^{T}  \partial_{p}f+\lambda\partial_{p}gdt+\mu\partial_{p}g_{0}\Bigr|_{t = 0}
+
+
+      \end{array}
+     </td>
+      <td width="45%">
+        \begin{array}{l}
+         d_{p}J = \int_{0}^{T}  \partial_{p}f+\lambda\partial_{p}gdt+\mu\partial_{p}g_{0}\Bigr|_{t = 0}
+        \end{array}
+    </td>
+    </tr>
+
+
+</table>
+
+</div>
+
+# Examples application
+
+## Backpropagation, Feedforward Neural Network
+
+<div>
+\begin{array}{lc}
+\underset{p}{\mbox{minimize}} & J(x_{data},x_{L},p=W)  \\
+\end{array}
+
+To obtain the expression of the backpropagated gradients, we only have to substitute the specific expression of $$g$$ , and use
+the formula of the adjoint system for vector recurrent states.
+
+\begin{array}{lcm}
+\mbox{forward system} & g(x,W) = 0 = &   \begin{cases}
+      g(x_{L},x_{L-1},p) = x_{L}-\sigma(W_{L}x_{L-1}) = 0  \\
+      g(x_{L-1},x_{L-2},p) = x_{L-1}-\sigma(W_{L-1}x_{L-2}) = 0 \\
+      \vdots \\
+      g(x_{2},x_{1},p) = x_{2}-\sigma(W_{2}x_{1}) = 0\\
+      g(x_{1},x_{0},p) = x_{1}-\sigma(W_{1}x_{0}) = 0 \\
+      g(x_{0},p) = x_{0}-x_{input} = 0
+   \end{cases} \\
+\end{array}
+
+
+\begin{array}{lmc}
+\mbox{backward/adjoint system} & \begin{cases}
+        \partial_{x}J+\lambda_{T}^{T}\partial_{x_{T}}g_{T} = 0 \\
+        \lambda_{T}^{T}\partial_{x_{T-1}}g_{T}+\lambda_{T-1}^{T}\partial_{x_{T-1}}g_{T-1} =0 \\
+        \vdots \\
+        \lambda_{1}^{T}\partial_{x_{0}}g_{1}+\lambda_{0}^{T}\partial_{x_{0}}g_{0} = 0 \\
+        \end{cases} & \rightarrow \begin{cases}
+        \partial_{x}J+\lambda_{T}^{T} = 0 \\
+        -\lambda_{T}^{T}\sigma'(W_{L}x_{L-1})W_{L}+\lambda_{T-1}^{T} =0 \\
+        \vdots \\
+        -\lambda_{1}^{T}\sigma'(W_{L}x_{0})W_{1}+\lambda_{0}^{T} = 0 \\
+        \end{cases} \\
+\end{array}
+
+
+So the gradients of the cost function $$J$$ respect to the weights of the $$L-k$$ layer is
+
+\begin{array}{lc}
+\mbox{Gradient} &   \begin{equation}
+            d_{W_{L-k}} J_{aug} =\lambda_{L-k}^{T}\partial_{W_{L-k}} g_{L-k}=-\lambda_{L-k}^{T}\partial_{W_{L-k}} \sigma(W_{L-k}x_{L-k-1})
+    \end{equation}
+\end{array}
+</div>
+
+
+If you were naively taking forward derivatives in the case of a Feedforward neural network or a discretized evolutive PD, you wouldn't need the fancy derivation of the adjoint method  in the context of a constrained optimization problem to realise you are wasting in
+vane a lot of effort, if $$u_{k}$$ is the state of the forward system at time/layer $$k$$, when you write the expression of the
+gradients of the cost function evaluated at the final time/layer $$T$$ respect to the parameters at the $$k$$ step, you would get a matrix product expression that you can evaluate starting from the right to the left , or starting from the left to the right
+
+<div>
+\begin{array}{l}
+\partial_{p_{k}}J=\partial_{u_{L}}J^{T}\sigma'(u_{L})W_{L}\sigma'(u_{L-1})W_{L-1}\ldots\sigma'(u_{k})W_{k} \\
+\leftarrow \quad propagation \quad of \quad  \partial_{p_{K}}u_{K} \quad (size \quad N_{u_{k}}\times N_{p_{k}}) \\
+\rightarrow \quad propagation \quad of  \quad \partial_{u_{L}}J^{T}\sigma'(u_{L})W_{L} \quad (size \quad N_{u_{k}})
+\end{array}
+</div>
+
+
+Obviously you would go from right to left because the $$\partial_{u_{L}}J$$ is contracting the heavy $$\partial_{p}u$$ matrices into an array, this is we are using vector jacaobian products instead of jacobian vector products
+
+
+
+
+
+
+
+
+
+
+
+
+## Example adjoint, linear system
+
+It is interesting  to work the case of fitting a data point on the end of the trajectory of a linear ode system, because being able to write down the analytical expression
+can give some useful insights about the relation of the forward adjoint dynamics.
+<div>
+\begin{equation}
+J(x,p) = (x_{T}-\hat{x}(T,p))^{2}
+\end{equation}
+
+\begin{array}{lm}
+\mbox{subject to} & \begin{cases}
+                    \dot{x} = pAx \\
+                    x(t_{0}) = x_{0}
+                    \end{cases}
+\end{array}
+
+
+We just have to use the formula for the continuous case evaluated on discrete datapoints and we get the equations
+
+\begin{cases}
+\partial_{\dot{x}}g =  \mathbb 1 \\
+\dot{\partial_{\dot{x}}g} = 0 \\
+\partial_{x}g = -pA \\
+\partial_{p}g = -Ax \\
+\lambda(\tau = 0) = 2(x_{T}-\hat{x}(T,p)) \\
+\mu=\lambda(\tau = T)
+\end{cases}
+
+
+\begin{array}{lm}
+\mbox{adjoint system} & \begin{cases}
+                        \dot{\lambda^{T}}-\lambda^{T}pA = 0 \\
+                        \lambda^{T}(\tau = 0) = 2(x_{T}-\hat{x}(T,p))
+                        \end{cases}
+\end{array}
+
+The solutions to both systems are matrix exponentials with coefficients being $$A$$ in the forward system and $$A^{T}$$ in the backward system, this means that the
+exploding/vanishing trends will be the same, but they'll rotate in opposing directions
+
+
+\begin{array}{lm}
+\mbox{solution forward} & \begin{cases}
+                          x = e^{pAt}x_{0}
+                          \end{cases}
+\end{array}
+
+\begin{array}{lm}
+\mbox{solution adjoint} & \begin{cases}
+                          \lambda = e^{pA^{T}\tau}\lambda_{0} = e^{pA^{T}\tau}2(x_{T}-\hat{x}(T,p))
+                          \end{cases}
+\end{array}
+
+The forward system will propagate forward $$x_{0}$$ with $$e^{pAt}$$ and, the adjoint system will propagate $$\partial_{x}f|_{T}$$ backwards
+
+
+\begin{array}{lm}
+\mbox{Gradient = $d_{p} J(x,p)$ = } & \begin{cases}
+            \int_{\tau = 0}^{\tau = T} (e^{pA^{T}\tau}2(x_{T}-\hat{x}(\tau = 0,p)))(A\hat{x}(\tau))d\tau
+                \end{cases}
+\end{array}
+
+
+</div>
+
+
+
+## Example Continuous-limit Deep Learning, Odenet
+
+
+
+Extending the number of layers of a feedforward neural network to the continuous limit, is essentially the same that moving from a discrete ODE system scheme to its continuous expression.
+
+To make the analogy, NN/Ode more explicit, let's compare a basic feedforward neural network with the euler discretization of a linear dynamical system.
+<div>
+\begin{array}{lcmsd}
+\mbox{forward system} & g(x,W) = 0 = &   \begin{cases}
+       x_{L}-\sigma(W_{L}x_{L-1}) = 0  \\
+       x_{L-1}-\sigma(W_{L-1}x_{L-2}) = 0 \\
+      \vdots \\
+       x_{2}-\sigma(W_{2}x_{1}) = 0\\
+       x_{1}-\sigma(W_{1}x_{0}) = 0 \\
+       x_{0}-x_{input} = 0
+       \end{cases}  & \underset{\sigma(Wx)=(A+\mathbb 1)x}{\rightarrow}  & \begin{cases}
+       x_{T}-(A\Delta t+\mathbb 1)x_{T-1} = 0  \\
+       x_{T-1}-(A\Delta t+\mathbb 1)x_{T-2} = 0 \\
+      \vdots \\
+       x_{2}-(A\Delta t+\mathbb 1)x_{1} = 0\\
+       x_{1}-(A\Delta t+\mathbb 1)x_{0} = 0 \\
+       x_{0}-x_{input} = 0
+       \end{cases} \\
+\end{array}
+
+
+If we employ a more widespread variant of NN, that employ skip connections, resnets, the resemblance  is even more striking,
+
+
+\begin{array}{lcms}
+\mbox{forward system}  &   \begin{cases}
+       x_{L} = \sigma(W_{L}x_{L-1})   \\
+       x_{L-1} = \sigma(W_{L-1}x_{L-2})  \\
+      \vdots \\
+       x_{2} = \sigma(W_{2}x_{1}) \\
+       x_{1} = \sigma(W_{1}x_{0})  \\
+       x_{0} = x_{input}
+       \end{cases}  & \underset{skip \quad connections}{\rightarrow}  & \begin{cases}
+        x_{L} = \sigma(W_{L}x_{L-1})+x_{L-1}   \\
+       x_{L-1} = \sigma(W_{L-1}x_{L-2})+x_{L-2}  \\
+      \vdots \\
+       x_{2} = \sigma(W_{2}x_{1})+x_{1} \\
+       x_{1} = \sigma(W_{1}x_{0})\\
+       x_{0} = x_{input}
+       \end{cases} \\
+\end{array}
+
+
+\begin{eqnarray}
+\partial_{x_{L-k}}J=\partial_{x_{L}}J\sigma'(z_{L})W_{L}\sigma'(z_{L-1})W_{L-1}\ldots\sigma'(z_{L-k+1})W_{L-1k+1} \rightarrow\\
+ \rightarrow  \partial_{x_{L-k}}J=\partial_{x_{L}}J(\sigma'(z_{L})W_{L}+\mathbb 1)(\sigma'(z_{L-1})W_{L-1}+\mathbb \\ 1)\ldots(\sigma'(z_{L-k+1})W_{L-k+1}+\mathbb 1)
+\end{eqnarray}
+
+</div>
+
+
+Adding more layers to a resnet, with increansingly smaller steps, the network state evolution equation,
+\begin{equation}
+x_{t+1} = A(x_{t},\theta)+x_{t}
+\end{equation}
+starts resembling an euler integration step.
+Taking this to the limit of small steps, we can parametrize the continuous dynamics of a neural network state by an ODE.
+\begin{equation}
+\dot{x} = A(x,\theta)
+\end{equation}
+Now the gradients must be calculated using the continuous formulation of the adjoint method, and the forward and backward passes are calculated with regular ode solvers.
+
+
+<div>
+
+\begin{equation}
+J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{Data},x(t=T,p,x_{input}))\delta(T) dt
+\end{equation}
+
+
+
+\begin{array}{l}
+ g(x,\dot{x},t,p) = \dot{x}-A(x,p,t) = 0 \\
+ g_{0}(x_{input},p) = x(t = 0)-x_{input} = 0
+ \end{array}
+
+
+
+ \begin{array}{lc}
+\mbox{general backward/adjoint system} & \begin{cases}
+       \dot{\lambda(\tau)}\partial_{\dot{x}}g - \lambda(\tau)\dot{\partial_{\dot{x}}}g + \lambda(\tau)\partial_{x}g = -\partial_{x}f  \\
+     \lambda(\tau = 0) = 0 \\
+      \mu=\lambda\partial_{\dot{x}}g\partial_{x}g_{0}^{-1}
+   \end{cases} \\
+\end{array}
+
+
+
+\begin{cases}
+\partial_{\dot{x}}g =  \mathbb 1 \\
+\dot{\partial_{\dot{x}}g} = 0 \\
+\partial_{x}g = -\partial_{x}A \\
+\partial_{p}g = -\partial_{p}A \\
+\lambda(\tau = 0) = -\sum_{i}^{Ndata}\partial_{x}f \\
+\mu= 0
+\end{cases}
+
+
+
+
+\begin{array}{lc}
+\mbox{odenet backward/adjoint system} & \begin{cases}
+       \dot{\lambda(\tau)}  = - \lambda(\tau)\partial_{x}g   \\
+     \lambda(\tau = 0) = -\sum_{i}^{Ndata}\partial_{x}f
+   \end{cases} \\
+\end{array}
+
+
+
+
+\begin{array}{lc}
+\mbox{odenet Gradient} & \begin{equation}
+ d_{p}J_{aug} = \int_{T}^{0} \lambda(t)\partial_{p}A(t)dt
+ \end{equation} \\
+\end{array}
+
+</div>
+
+
+
+
+
+## Solving the Adjoint problem for "free" with autodiff libraries, backwards differentiation
+
+
+One of the most basic that autodiff libraries implement is the vector jacobian product, wich allow us to backpropagate  the gradient of a scalar function backwards to the weights.
+This is like the automatic calculation of the adjoint state for discrete explicit systems shown before, but nowadays more libraries implement the automatic calculation
+of all the variants of the adjoint method discussed here. Even simulation frameworks such as FeniCS, implement the automatic calculation of the adjoint state, so we rarely have to
+care to implement it unless is a very specific odd case.
+
+Here I'll show an example of the solution of the forward and backward problem for the analytically solved linear system before, employing in pytorch a rungekutta scheme as our "layer",
+to compute the forward system.
+
+Of course this is only used for demonstration porpuses, we should use the continous implementation of the adjoint wich is discretization independent, and can handle implicit schemes.
+
+'''
+
+def make_system():
+
+    def system_linear(x,t,params):
+
+        k,gamma = params["k"], params["gamma"]
+
+        dx1dt = x[0][1]
+        dx2dt = -k*x[0][0]-gamma*x[0][1]
+
+        return torch.cat([dx1dt.view(-1,1), dx2dt.view(-1,1)], dim = 1)
+
+    k = torch.tensor([1])
+    gamma = torch.nn.Parameter( torch.tensor([0.01]) )
+    params = {"k":k,"gamma":gamma}
+    system = partial(system_linear, params = params)
+
+    return system, params
+
+
+def _rk4_step(fun, yk, tk, h):
+
+    k1 = fun(yk, tk)
+    k2 = fun(yk + h/2*k1, tk + h/2)
+    k3 = fun(yk + h/2*k2, tk + h/2)
+    k4 = fun(yk + h*k3, tk + h)
+
+    yk_next = yk + h/6*(k1+2*k2+2*k3+k4)
+
+    return yk_next
+
+Pytorch just build a graph when we recurrently calculate the solution of the forward problem, used to calculate the gradient that propagates backwards
+def rk4(fun, y0, t, retain_grad = False):
+
+    y = []
+
+    h = t[1]-t[0]
+    yk = y0
+    y.append(yk)
+
+    for i in range(1,len(t)):
+        yknext = _rk4_step(fun, yk, t[i-1], h)
+        yk = yknext
+
+        if retain_grad:
+            yk.retain_grad()
+
+        y.append(yk)
+
+    return y
+
+
+The forward pass is the solution of our system for a given input/forcing....
+
+def forward_pass(x0,T, system):
+
+    out = rk4(system, x0, T, retain_grad = True)
+
+    return out
+
+
+
+
+
+We solve the forward problem
+
+  out = forward_pass(x0, T, system)
+
+Here we just concatenate all the outputs at the datapoints of interest
+
+  xpred = torch.cat([out[i] for i in indices_data], dim = 0)
+
+We  calculate the loss
+
+  loss = torch.mean( torch.square(xpred-xdata))
+
+  We slve the adjoint problem
+
+
+  loss.backward()
+
+
+
+'''
+
+One data point start
+
+<div style="width:100%; min-width:250px; display: inline-block; vertical-align: top;text-align:center;">
+
+    <video style="width:100%;min-width:250px;" controls="">
+    	<source src ="{{ "/assets" | relative_url }}/media/adjoint/vid1.mp4"  type="video/mp4">
+    </video>
+
+
+</div>
+
+More than one data point
+
+<div style="width:100%; min-width:250px; display: inline-block; vertical-align: top;text-align:center;">
+
+    <video style="width:100%;min-width:250px;" controls="">
+    	<source src ="{{ "/assets" | relative_url }}/media/adjoint/vid2.mp4"  type="video/mp4">
+    </video>
+
+
+</div>
+
+
+
+
+# Appendix
+
+
+
+## General derivation for vector states
+
+<div>
+\begin{array}{lc}
+\underset{p}{\mbox{min}} & J(x,p) =  f(x,p)   \\
+\end{array}
+\begin{array}{lc}
+\mbox{subject to} & g(x,p) = 0
+\end{array}
+
+\begin{array}{l}
+\mbox{with } x\in\Re^{nx},p\in\Re^{np} \\
+g: \Re^{nx}\times\Re^{np}\rightarrow \Re^{nx} \\
+f: \Re^{nx}\times\Re^{np}\rightarrow \Re \\
+\mbox{being } \partial_{x}g \mbox{ non singular}
+\end{array}
+</div>
+
+We are interested in finding the gradient $$d_{p}J$$. To that end we take derivatives of $$J$$ and $$g$$ respect to the parameteres $$p$$
+
+<div>
+\begin{array}{lc}
+ d_{p}J =  \partial_{p}f^{T} +\partial_{x}f^{T}\partial_{p}x   \\
+ \partial_{x}g\partial_{p}x=-\partial_{p}g
+\end{array}
+</div>
+
+Substituting $$\partial_{p}x$$ in $$d_{p}J$$, we arrive at
+
+
+
+\begin{array}{l}
+ d_{p}J = \partial_{p}f^{T} -\partial_{x}f^{T}\partial_{x}g^{-1}\partial_{p}g  
+\end{array}
+
+
+The thing is, $$\partial_{x}g^{-1}$$, appearing in $$d_{p}J$$ as the  product of $$\partial_{x}f^{T}\partial_{x}g^{-1}$$, makes it unnecesary to solve the larger system $$\partial_{x}g\partial_{p}x=-\partial_{p}g$$, we can instead find the vector $$\lambda^{T}\in\Re^{nx}$$ that satisfies $$\partial_{x}f^{T}\partial_{x}g^{-1}=\lambda^{T}$$, arriving at the adjoint system.
+
+\begin{equation}
+-\partial_{x}f^{T}\partial_{x}g^{-1}=\lambda^{T}\rightarrow \underset{adjoint \quad system}{\partial_{x}g^{T}\lambda = -\partial_{x}f}
+\end{equation}
+
+There is a more practical and general derivation of the adjoint method, that is through the use of lagrange multipliers. Let's start by building the augmented objective function by appending the constraint with lagrange multiplier $$\lambda^{T}$$. The important thing to realize here, is , because $$g(x,p)=0$$, $$\lambda^{T}$$ can take any value we want without altering the solution of the problem.
+
+
+
+
+\begin{array}{lc}
+\underset{p}{\mbox{min}} & J_{aug}(x,p) = f(x,p) + \lambda^{T}g(x,p)  \\
+\end{array}
+
+
+
+Taking derivatives respect to the parameter $p$ of the augmented function, and getting common factor $$\partial_{p}x$$, we arrive at
+
+\begin{equation}
+d_{p}J_{aug} = \partial_{p}f+\partial_{x}f\partial_{p}x+\lambda^{T}(\partial_{p}g+\partial_{x}g\partial_p{x})
+\end{equation}
+
+
+\begin{equation}
+d_{p}J_{aug} = \partial_{p}f +\lambda^{T}\partial_{p}{g} + (\partial_{x}f+\lambda^{T}\partial_{x}g)\partial_{p}x
+\end{equation}
+
+Now, we exercise our freedom of choice for $$\lambda^{T}$$ and choose such, that cancels the $$\partial_{p}x$$ term, arriving againg to the adjoint equation.
+
+\begin{equation}
+\partial_{x}g^{T}\lambda = -\partial_{x}f
+\end{equation}
+
+
+
+## Derivation for the specific case of state systems with coherent sequential structure.
+
+
+Such as in the case of neural networks, and dynamical systems, we are specially interested in systems, where the state is transformed sequentially. Let's assume for simplicity that the system  is evaluated at its final stage, last layer in a nn, final position in a control problem.
+
+
+
+
+<div>
+\begin{array}{lc}
+\underset{p}{\mbox{minimize}} & J(x_{T},p)  \\
+\end{array}
+
+
+\begin{array}{lcm}
+\mbox{subject to} & g(x,p) = 0 = &   \begin{cases}
+      g(x_{T},x_{T-1},p) = 0  \\
+      g(x_{T-1},x_{T-2},p) = 0 \\
+      \vdots \\
+      g(x_{2},x_{1},p) = 0\\
+      g(x_{1},x_{0},p) = 0 \\
+      g(x_{0},p) = 0
+   \end{cases} \\
+\end{array}
+</div>
+
+
+The derivation in the last section is still valid, in this case, but doesnt give much insight. Let's create the augmented objective function by adding each constraint equation with a lagrange multiplier.
+
+
+\begin{equation}
+J_{aug}(x_{T},p) = J(x_{T},p) + \lambda_{T}g(x_{T},x_{T-1},p) + \lambda_{T-1}g(x_{T-1},x_{T-2},p) \ldots \lambda_{1}g(x_{1},x_{0},p)+ \lambda_{0}g(x_{0},p)
+\end{equation}
+
+
+Let's again take derivatives respect to $$p$$. Our objective is to get rid of the $$d_{p}x_{Tk}$$ terms, so let's take common factor of each one of them
+
+
+
+
+<div>
+\begin{eqnarray}
+d_{p} J_{aug} = \partial_{p} J + \partial_{x}J \partial_{p}x+
+\lambda_{T}(\partial_{x_{T}}g_{T}d_{p}x_{T} + \partial_{x_{T-1}}g_{T}d_{p}x_{T-1}+\partial_{p}g_{T})+ \\
+\lambda_{T-1}(\partial_{x_{T-1}}g_{T-1}d_{p}x_{T-1} + \partial_{x_{T-2}}g_{T-1}d_{p}x_{T-2}+\partial_{p}g_{T-1})+ \\
+\ldots \\
+\lambda_{1}(\partial_{x_{1}}g_{1}d_{p}x_{1} + \partial_{x_{0}}g_{1}d_{p}x_{0}+\partial_{p}g_{1})+
+\lambda_{0}(\partial_{x_{0}}g_{0}d_{p}x_{0} + \partial_{p}g_{0})
+\end{eqnarray}
+</div>
+
+<div>
+\begin{eqnarray}
+d_{p} J_{aug} = \partial_{p} J +
+(\partial_{x}J+\lambda_{T}\partial_{x_{T}}g_{T})d_{p}x_{T}+
+(\lambda_{T}\partial_{x_{T-1}}g_{T}+\lambda_{T-1}\partial_{x_{T-1}}g_{T-1})d_{p}x_{T-1} + \\
+\ldots \\
+(\lambda_{1}\partial_{x_{0}}g_{1}+\lambda_{0}\partial_{x_{0}}g_{0})d_{p}x_{0}+
+\lambda_{T}\partial_{p}g_{T}+\lambda_{T-1}\partial_{p}g_{T-1}+\ldots +
+\lambda_{1}\partial_{p}g_{1}+
+\lambda_{0}\partial_{p}g_{0}
+\end{eqnarray}
+</div>
+
+Now, we have a different lagrange multiplier in every paranthesis that we can use to make that term vanish, doing so, we arrive at a system of equations that can be solved backwards.
+
+
+It is worth noting, that this is just a more formal reformulation of the algorithm of backpropagation in deep learning
+
+
+
+<div>
+\begin{array}{lm}
+\mbox{backward/adjoint system} & \begin{cases}
+        \partial_{x}J+\lambda_{T}\partial_{x_{T}}g_{T} = 0 \\
+        \lambda_{T}\partial_{x_{T-1}}g_{T}+\lambda_{T-1}\partial_{x_{T-1}}g_{T-1} =0 \\
+        \vdots \\
+        \lambda_{1}\partial_{x_{0}}g_{1}+\lambda_{0}\partial_{x_{0}}g_{0} = 0 \\
+        \end{cases} \\
+\end{array}
+
+
+
+
+\begin{array}{lm}
+\mbox{Gradient} & \begin{equation}
+        d_{p} J_{aug} = \partial_{p} J +
+        \lambda_{T}\partial_{p}g_{T}+\lambda_{T-1}\partial_{p}g_{T-1}+\ldots +
+        \lambda_{1}\partial_{p}g_{1}+
+        \lambda_{0}\partial_{p}g_{0}
+        \end{equation}
+\end{array}
+
+
+
+\begin{array}{lm}
+\mbox{forward/state system} &   \begin{cases}
+      g(x_{T},x_{T-1},p) = 0  \\
+      g(x_{T-1},x_{T-2},p) = 0 \\
+      \vdots \\
+      g(x_{2},x_{1},p) = 0\\
+      g(x_{1},x_{0},p) = 0 \\
+      g(x_{0},p) = 0
+   \end{cases} \\
+\end{array}
+</div>
+
+## Derivation of the adjoint method for  time dependent states
+
+
+Now let's deal with the case where the state is a time dependent function, this would be the problem we would have, for instance,  in optimal control or trying to fit the parameters of an ode to data.
+
+<div>
+\begin{array}{lc}
+\underset{p}{\mbox{minimize}} & J(x(t),p) = \int_{0}^{T} f(x(t),p) \,dt  \\
+\end{array}
+
+
+
+\begin{array}{lc}
+\mbox{subject to} & \begin{cases}
+      g(\dot{x},x,p) = 0  \\
+      g_{0}(x_{0},p) = 0
+   \end{cases} \\
+\end{array}
+</div>
+
+Let's build the augmented objective function by plugging the constraints with their respective lagrange multipliers, taking into account that $\lambda^{T}(t)$ is now a function of time
+
+
+\begin{equation}
+ J_{aug} = \int_{0}^{T} f(x(t),p)+ \lambda(t)^{T}g(\dot{x},x,p) dt + \mu g_{0}(x_{0},p)
+ \end{equation}
+
+
+ We aim to calculate $d_{p}Jaug$, our goal is the same as before, take gradients respect to $p$, and try to get rid of $\partial_{p}x(t)$ by using the lagrange multipliers
+
+
+
+ \begin{equation}
+ d_{p}J_{aug} = \int_{0}^{T} \partial_{p}f+ \partial_{x}f\partial_{p}x  + \lambda(t)^{T}(\partial_{\dot{x}}g\underset{\partial_{x}\dot{x}\partial_{p}x=\dot{\partial_{p}x}}{\dot{\partial_{p}x}} +
+ \partial_{x}g\partial_{p}x +\partial_{p}g)   dt +
+ \mu (\partial_{x}g_{0}\partial_{p}x + \partial_{p}g_{0})\Bigr|_{t = 0}
+ \end{equation}
+
+
+
+
+ The mischevious term here is $$\int_{0}^{T} \lambda(t)\partial_{\dot{x}}g\dot{\partial_{p}x}$$, we need to have everything in terms of $$\partial_{p}x$$, not $$\dot{\partial_{p}x}$$, but because everything appears as inner products with $$\lambda$$, we can find the adjoint of the $$\frac{d}{dt}$$, in more amenable terms, we can integrate by parts to move the $$\frac{d}{dt}$$ to the left of the integral.
+
+<div>
+\begin{equation}
+ d_{p}J_{aug} = \int_{0}^{T} \lambda(t)\partial_{\dot{x}}g\dot{\partial_{p}x} = \lambda\partial_{\dot{x}}g\partial_{p}{x}\Bigr|_{t=0}^{t=T}-\int_{0}^{T} \dot{\lambda\partial_{\dot{x}}}g\partial_{p}{x}
+ \end{equation}
+</div>
+
+ We are free to choose the $$\lambda, \mu$$ terms, we do so by setting $$\lambda(T) = 0$$ to get rid of $$\dot{\partial_{p}{x}(T)}$$, and we arrange a similar solution in $$t=0$$ by seeking to make zero $$(\mu\partial_{x}g_{0}-\lambda\partial_{\dot{x}}g)\partial_{p}{x}(t=0)$$.
+
+
+
+
+<div>
+ \begin{equation}
+ d_{p}J_{aug} = \int_{0}^{T} \partial_{p}f+ \partial_{x}f\partial_{p}x  + \lambda(t)(\partial_{\dot{x}}g{\dot{\partial_{p}x}} +
+ \partial_{x}g\partial_{p}x +\partial_{p}g)   dt +
+ \mu (\partial_{x}g_{0}\partial_{p}x + \partial_{p}g_{0})\Bigr|_{t = 0}
+ \end{equation}
+
+
+
+ \begin{equation}
+ d_{p}J_{aug} = \int_{0}^{T} (\partial_{x}f - \dot{\lambda}\partial_{\dot{x}}g-\lambda\dot{\partial_{\dot{x}}}g+\lambda\partial_{x}g)\partial_{p}x
+ +\partial_{p}f+\lambda\partial_{p}gdt
+ + (\mu\partial_{x}g_{0}-\lambda\partial_{\dot{x}}g)\partial_{p}{x})\Bigr|_{t = 0} +\mu\partial_{p}g_{0}\Bigr|_{t = 0}
+ \end{equation}
+</div>
+
+
+<div>
+ \begin{array}{lc}
+ \mbox{forward/state system} & \begin{cases}
+       g(\dot{x},x,p) = 0  \\
+       g_{0}(x_{0},p) = 0
+    \end{cases} \\
+ \end{array}
+</div>
+
+ By making zero the term that accompanies $$\partial_{p}x$$ in the integral, we arrive at the continuous adjoint system, we change time variables so the system is integrated backwards from $$\tau|^{T}_{0}$$.
+
+
+<div>
+ \begin{array}{l}
+    t \rightarrow \tau \\
+    with \quad t = T-\tau
+\end{array}
+
+
+\begin{array}{lc}
+\mbox{backward/adjoint system} & \begin{cases}
+       \dot{\lambda(\tau)}\partial_{\dot{x}}g - \lambda(\tau)\dot{\partial_{\dot{x}}}g + \lambda(\tau)\partial_{x}g = -\partial_{x}f  \\
+     \lambda(\tau = 0) = 0 \\
+      \mu=\lambda\partial_{\dot{x}}g\partial_{x}g_{0}^{-1}
+   \end{cases} \\
+\end{array}
+
+
+\begin{array}{lc}
+\mbox{Gradient} & \begin{equation}
+ d_{p}J_{aug} = \int_{0}^{T}  \partial_{p}f+\lambda\partial_{p}gdt+\mu\partial_{p}g_{0}\Bigr|_{t = 0}
+ \end{equation} \\
+\end{array}
+
+</div>
+
+It is worth noting that discretizing this system, we arrive at the set of equations of last section
+
+
+## Data evaluated at discrete times
+
+<div>
+\begin{equation}
+J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(t_{i}) dt
+\end{equation}
+
+\begin{equation}
+\partial_{x}f = -2\sum_{i}^{{Ndata}}(x_{t_{i}}-\hat{x}(t_{i},p)) \delta(t_{i})
+\end{equation}
+
+
+\begin{equation}
+ \dot{\lambda}\partial_{\dot{x}}g -\lambda\dot{\partial_{\dot{x}}}g+\lambda\partial_{x}g = - \sum_{i}^{Ndata}A(x_{data},\hat{x})\delta(\tau_{i})
+\end{equation}
+
+\begin{equation}
+\lambda(\tau_{i}^{+})-\lambda(\tau_{i}^{-}) = -A(x_{data},\hat{x}) = 2(x_{t_{i}}-\hat{x}(t_{i},p))
+\end{equation}
+</div>
