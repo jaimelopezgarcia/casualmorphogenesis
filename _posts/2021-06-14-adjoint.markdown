@@ -868,7 +868,6 @@ More than one data point
 
 </div>
 
-## Paring words, dynamical systems and ODEnets
 
 
 # Appendix
