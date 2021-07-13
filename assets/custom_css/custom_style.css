@@ -36,6 +36,15 @@
 
 
 
+.caption {
+
+  width: 50%;
+  font-size:12px;
+  margin-bottom:50px;
+  margin-left: 100px;
+
+}
+
 
 .tooltip {
   position: relative;

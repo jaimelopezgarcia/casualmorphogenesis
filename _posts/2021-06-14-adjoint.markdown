@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Adjoint method and its different flavors, from optimal control to Odenets"
+title:  "The different flavors of the Adjoint method, from Seismic tomography to ODEnets"
 date:   2021-06-15 21:11:03 +0200
 permalink: /posts/adjoint/
 
@@ -9,22 +9,23 @@ permalink: /posts/adjoint/
 
 # Introduction
 
-# Adjoint Method
-
-Pontryagin, Lev S., et al. "The mathematical theory of optimal processes, translated by KN Trirogoff." New York (1962).
-[https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf](https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf)
 
 
-Broadly speaking, the adjoint method is a method to efficiently caculate gradients of scalar functions in constrained optimization problems with many parameters. Fitting the parameters of evolutive system, fitting a neural net to some data, optimal control, inverse problems, all use the same mathematical backbone to calculate, the gradients of the systems, some times is called a "trick", in deep learning and computer science is called backpropagation or backward differentiation, in control applications is sometimes called  coestate, in optimization the adjoint equation is usually employed...
-So comming from some specific background, it might be hard to understand how all this apparently different methods, share the same general formulation. Besides, there are some very arcane explanations around, and most of the explanations are ussually fit to the specific application at hand, and when faced a different problem, even if the difference in the formulation is just cosmetic, is hard to identify is the same thing.  
-with  It is intimately related to the very basic concept of lagrange multipler and as most things in life can be reformulated as a constrained optimization problem, it is no wonder why this method appeared paralelly in different disciplines with different names.
+
+Broadly speaking, the adjoint method is a method to efficiently calculate gradients of scalar functions in constrained optimization problems with many parameters.
+
+ Fitting the parameters of an evolutive system, optimal control, inverse problems, all use the same mathematical backbone to calculate the cost function gradients with respect to the parameters. Depending on the specific structure of cost function and the system to solve  ( continuous/discrete, evolutive...), different ad-hoc implementations have been implemented in different disciplines, with their own naming and algorithms. Control applications sometimes name it the coestate, in Deep Learning it is called Backpropagation, in ODE analysis is often cited as Sensitivity Analysis...
+
+So,  it might be hard to understand at first  how all these different methods, across these different disciplines, share the same underground mathematical formulation. Besides, there are some very arcane explanations around, not offering any intuitive insight, usually fit to the specific application at hand, and even if the difference between the formulation of two different problem is just cosmetic, it might be hard to identify them as the same mathematical entity.  
 
 
 # Motivation
 
-When we have an   system that depends on some parameters $$p$$ and some input $$x$$, that produces some output $$u$$. Evaluating that model requires is called the **forward problem**, if our system is the ode describing the movement of a damped pendulum , the forward pass is just  plugging some forcing function on the rhs, or a "kick" and integrate the equations to evaluate the output u(t). If our system is a feed forward neural net the forward pass is just feeding some data propagate it  and getting some output $$y$$. But many times we need to go in the other direction, this is, solving the inverse problem that answers the question, "which are the inputs/parameters that generate this output" , this usually involves solving some constrained optimization problem and propagating information in the backward direction, which is the **backward problem** (forward backward might not be so intuitive with non evolutive systems but the method is the same).
+Let's say we have a system that depends on some parameters $$p$$ and some input $$x$$, producing some output $$u$$.
 
+Evaluating that model requires solving the so called  **forward problem**, e.g, if our system is the ODE describing the movement of a damped pendulum, the forward pass will consist in plugging some forcing/impulse term on the RHS,  and integrate the equations to evaluate the output u(t,p). If our system is a feed-forward neural net, the forward pass will be calculated by feeding the net some data, propagate it and getting some output $$y(x,p)$$.
 
+Many times, we need to travel in the opposite direction, this means, we must solve the inverse problem that answers the question, "which are the inputs/parameters that generate this output", this usually involves solving some constrained optimization problem and propagating information in the backward direction, which comprises the **backward problem**.
 
 
 
@@ -34,7 +35,6 @@ When we have an   system that depends on some parameters $$p$$ and some input $$
 
 <div class = "container">
 
-<h3> Example problems that adhere to this description</h3>
 <table>
     <tr>
         <th width="33%"> Feedforward NN </th>
@@ -105,77 +105,114 @@ When we have an   system that depends on some parameters $$p$$ and some input $$
 
 </table>
 
+<div class = "caption">
+   <b > Notable examples  that adhere to this description.  </b> Regression task with a FF NN. Finding the optimal \(u(t)\) that stabilizes a linear system. Finding the source terms \(b\) and propagation parameters, \(A\) , such as density in Seismic tomography.
+</div>
+
+</div>
 
 
 
-Let's ilustrate  this with some specific example
+
+Let's illustrate  this with some specific example. Let's assume we have some shallow tank, filled with some steady liquid sustance, and we are interesting in obtaining a specific spatial temperature profile.
+
+To control the temperature $$u(x,y)$$, we can inject some reactive flow $$p$$ at different positions, that reacts very quickly and it's equivalent to some net "temperature injection rate/reactive_mass", $$C_{r}$$.
+
+The temperature profile will be modelled by some Reaction-Diffusion equation with some source term depending on our parameters $$p_{ij}$$. We'll consider a linear model for simplicity.
 
 <div>
 \begin{array}{l}
 
 \underset{p}{argmin}J(p) = \sum_{D}(u_{ijD}-u(p,x_{i}, y{j})) \\
-subject \quad to \quad g(x,y,p) = \Delta u-\sigma u - C\sum p_{ij}\delta(x_{i},y_{j}) = 0\\
+subject \quad to \quad g(x,y,p) = D\partial_{x}^{2}u + \sigma u - C\sum^{N_{p}} p_{ij}\delta(x_{i},y_{j}) = 0\\
 B.C
 
 \end{array}
 
 
 
-Let's work with the discretized problem to make it simpler
+Let's work with the discretized version of the system to avoid now the unnecesary complications of functional calculus at this time.
 
 
 \begin{array}{l}
 \underset{p}{argmin}J(p) = \sum_{D}(u_{ijD}-u(p,x_{i}, y{j})) \\
-subject \quad to \quad Au = Cp
+subject \quad to \quad Au = Cp \\
 B.C
 \end{array}
 </div>
 
-<div>
-where $$p$$ is an array with zeros in all entries where there is no injection.
+The $$u_{ijD}$$ term represent the setpoint temperature at different $$ij$$ positions.
 
-To get our target temperature distribution, we have to calculate the gradients of the cost function $$J(p)$$ with respect to the parameters, $$d_{p} J$$.
+Now $$C$$ is a matrix with $$0$$ at spatial entries where there are no flow injection and $$C_{r}$$ where we have some injection $$p_{ij}$$
 
-Applying the chain rule we get $$d_{p} J = \partial_{u} J\partial_{p}u + \partial_{p}J$$, here the term $$\partial_{p}u$$ is the nasty bit, which enforces the constraint as it is implicitely present in the constrain equation. Let's have in mind that $$\partial_{p}u$$  has  $$N_{u}xN_{p}$$ elements where $$N_{p}$$ is the number of controls and $$N_{u}$$ is the number of nodes in our mesh.
+The **forward problem** then, will consist in solving a linear system for the  $$N_{u}$$ nodes of our mesh.
 
-Trying to find $$d_{p}J$$ naively by finite differences would require solving $$N_{p}$$ times $$g(x,y,p)$$, not cool.
-Trying to solve numerically $$\partial_{p}u$$ in $$g$$ is not much better, we would have to solve $$N_{p}$$ $$A\partial_{p_{ij}}u = Cp_{ij}$$ (ij is the label of the ij controller) systems, not cool.
+To solve the minimization problem, we'll have to calculate the gradients of the cost function $$J(p)$$ with respect to the parameters, $$d_{p} J$$.
 
-To get around this, the key realization here is that our objective function is just an scalar function, and at every $$p$$ point, this $$J$$ function only care about $$u$$ directions that make it change, this is $$\partial_{u}J$$. This can be made obvious with some example.
+Applying the chain rule we get $$d_{p} J = \partial_{u} J\partial_{p}u + \partial_{p}J$$. Here the term enforcing the constraint, $$\partial_{p}u$$, is the nasty bit. Because we have to evaluate the derivative of the temperature at every node $$u_{km}$$ respect to every $$p_{ij}$$, $$\partial_{p}u$$  has  $$N_{u} \times N_{p}$$ elements where $$N_{p}$$ is the number of controls, not cool.
+
+Trying to find $$d_{p}J$$ naively by finite differences would require solving $$ N_{p}$$ times $$g(u,p) = 0 $$, not cool.
+
+Trying to solve numerically $$\partial_{p}u$$ in $$ A\partial_{p_{ij}}u = C\delta_{ij} $$ will imply solving $$N_{p}$$ systems of similar complexity than the forward problem , not cool.
+
+To get around this, the key realization here is that our objective function is just an scalar function $$J(u(p))$$, and at every $$u(p)$$ , we only care about the $$u$$ direction $$J$$ is most sensitive to, this is $$\partial_{u}J$$. This can be made obvious with the following example.
 
 Let's imagine in the last problem that we only care about controlling the temperature at  some specific $$u(x_{k},y_{m})$$ node,
-\underset{p}{argmin}J(p) = (u_{kmD}-u(p,x_{k}, y{m})**2 \\
-subject \quad to \quad Au = Cp
+
+<div class = "container">
+\begin{array}{l}
+\underset{p}{argmin}J(p) = (u_{kmD}-u(p,x_{k}, y{m})^{2} \\
+subject \quad to \quad Au = Cp \\
 B.C
 \end{array}
-
-
 </div>
 
-It is obvious here that we only need to solve the $A\partial_{p}u_{km}=Cp$$ system, because we only care about the $$\partial{p}u_{km}$$ term.
 
-But there is nothing special about the $$u_{km}$$ direction, if there are more $$u's$$ in the cost function, the direction we are interested about will be a direction with non zero components in different $$u's$$ but a single direction anyway.
 
-So how can we work with this single direction instead of all the $$\partial_{p}u$$ beast?, that's where the adjoint comes front.
-The adjoint $$B$$ of a linear operator is another operator that satisfy $$<Bv,w> = <v,Aw>$$, we are so used to apply this in the context of matrix algebra, that is easy to
-miss what is behind, when dealing with matrix operators,  the inner product is $$v^{T}Aw$$ , we can calculate first Aw, or we can move A to the life like (A^{T}v)^{T}w, here we are using the adjoint matrix of A, which is just the traspose, rather than the matrix specific application, is better to have the $$<Bv,w> = <v,Aw>$$ idea in mind, because it is much more general,
-and if we are dealing with operators on functional spaces for example, we can think of the adjoint operator as the "generalization " of the traspose matrix in linear algebra ( the adjoint op when dealing with functional operators, can be found using integration by parts).
+It is obvious here that we only need to solve one additional system, $$A\partial_{p}u_{km}=Cp$$ , because we only care about the $$\partial_{p}u_{km}$$ term.
 
-Having this in mind,
+But if we think about it,  there is nothing special about the $$u_{km}$$ direction, if there are more $$u's$$ in the cost function, the direction we are interested about will be a direction with non zero components in different $$u's$$ but a single direction anyway. We can imagine $$\partial_{u}J$$ as some vector  pointing in a specific direction in $$u$$ space. If $$J(u)=J(u_{km})$$, only the $$km$$ entry will be non zero, $$(0,0,0,\partial_{ukm}J,0,\dots, 0)$$. Similarly if the dependence is given by some $$Q$$ cost matrix over all nodes $$J(u) = u^{T}Qu$$, $$\partial_{u}J$$ at some certain $$p$$, will just be a less sparse vector in $$u$$ space.
+
+So how can we work with this single direction instead of all the $$\partial_{p}u$$ beast?, that's where the Adjoint method comes into play. Let's remember some definitions.
+
+The adjoint $$B$$ of a linear operator is another operator that satisfy
+
+\begin{equation}
+ <Bv,w> = <v,Aw>
+\end{equation}
+
+  Actually, we are so used to apply this in the context of matrix algebra, that is easy to
+miss what is behind.
+
+When dealing with vector spaces,  the inner product $$<v,w>$$, will be some expression like this $$v^{T}Aw$$ (if A is a diagonal unitary matrix, we get pythagoras). We can first calculate Aw, or we can move A to the left  $$(A^{T}v)^{T}w$$, here we are using the adjoint matrix of A, which is just the transpose matrix; rather than the matrix specific application, is better to keep the $$<Bv,w> = <v,Aw>$$ expression in mind, because it is much more general,
+and if we are dealing with operators on functional spaces for instance, we can think of the adjoint operator as the "generalization " of the transpose matrix in linear algebra<sup id="fnref:fn2" role="doc-noteref"><a href="#fn:fn2" class="footnote" rel="footnote">2</a></sup>.
+
+The $$d_{p}J$$ increments due to perturbations of the parameters $$\Delta p$$ is given by the inner product
+
 
 <div>
+
 \begin{array}{l}
 dJ(p) = <\partial_{u}J, \partial_{p}u \Delta p> = <\partial_{u}J, \partial_{u}g^{-1}\partial_{p}g \Delta p>
+\end{array}
+
 </div>
 
-By definition $$\partial_{p}J$$ will be the thing on the left in the dJ(p) = <\partial_{p}J, \Delta p> expression, so we have to move the $$\partial_{u}g^{-1}\partial_{p}g$$ operator to the left bracket,
+Where we have expressed $$\partial_{p}u$$ as the solution of the linear system we get by differentiating the constraint $$g(u,p)$$ respect to the parameters $$p$$, (I know, the deal here is avoding the calculation of $$\partial_{p}u$$, nonetheless, it is an auxiliary insightful step).
+
+\begin{equation}
+\partial_{u}g\partial_{p}u +\partial_{p}g= 0
+\end{equation}
+
+By definition $$\partial_{p}J$$ will be the thing on the left in the $$dJ(p) = <\partial_{p}J, \Delta p>$$ expression, so we must find some $$<G(p),\Delta p>$$ expression, we achieve this by  moving the $$\partial_{u}g^{-1}\partial_{p}g$$ operator to the left side,
 <div>
 \begin{array}{l}
-dJ(p) = <\partial_{u}J, \partial_{u}g^{-1}\partial_{p}g \Delta p> = <( \partial_{u}g^{-1}\partial_{p}g)^{T} \partial_{u}J,  \Delta p>
+dJ(p) = <\partial_{u}J, -\partial_{u}g^{-1}\partial_{p}g \Delta p> = <( -\partial_{u}g^{-1}\partial_{p}g)^{T} \partial_{u}J,  \Delta p>
 \end{array}
 </div>
 
-The thing on the left is our variable of interest, $$\partial_{p}J$$, but expressed like that, it doesn't look that we made any advance, but there is in fact a linear system in disguise there, of only $$N_{u}$$ unknowns, instead of the $$\partial_{u}g\partial_{p}u = -\partial_{p}g$$ system with $$N_{u}xN_{p}$$ unkowns, this system is unfolded by doing the following.
+The thing on the left is our variable of interest, $$\partial_{p}J$$, but expressed like that, it doesn't look that we've made any advance, but there is in fact a linear system in disguise there, of only $$N_{u}$$ unknowns. We can avoid solving  $$\partial_{u}g\partial_{p}u = -\partial_{p}g$$ with $$N_{u} \times N_{p}$$ unkowns, and unfold the much smaller system of $$N_{u}$$ unknowns by setting the term $$\partial_{u}J^{T}\partial_{u}g^{-1}$$ to some unkown variable $$\lambda$$ of $$N_{u}$$ dimensions.
+
 <div>
 \begin{array}{l}
 \partial_{u}J^{T}\partial_{u}g^{-1} = \lambda^{T} \\
@@ -183,57 +220,76 @@ The thing on the left is our variable of interest, $$\partial_{p}J$$, but expres
 \end{array}
 </div>
 
-Wich is the adjoint system.
+Which is the adjoint system.
 
-Once we find the adjoint $$\lambda$$ , $$\partial_{p}J$$ is just calculated with $$<\partial_{p}g^{T}\lambda,  \Delta p> = <\partial_{p}J,\Delta p>$$, $$\partial_{p}J = \lambda^{T}\partial_{p}g $$.
+Once we find the adjoint $$\lambda$$ , $$\partial_{p}J$$ is just calculated by sustituting $$\partial_{u}(g^{-1})^{T}\partial_{u}J$$ by $$\lambda$$ in the $$dJ(p)$$ expression.
 
-Of course there are more mundane approaches to calculate the adjoint developped in the context of specific applications, explained in examples
+<div>
+\begin{equation}
+
+<-\partial_{p}g^{T}\lambda,  \Delta p> = <\partial_{p}J,\Delta p> \rightarrow \partial_{p}J = -\lambda^{T}\partial_{p}g
+
+\end{equation}
+
+</div>
+
 
 
 ## Putting it all together
 
-Being practical here, let's summarize the problem and the application of the adjoint method.
+Let's summarize the case problem and the application of the adjoint method.
 
-We have some system (dynamical system, neural network, stationary pde ...) with state $u$ dependent on some parameters $p$, whose response to an external input is expressed implicitely a a function $g(u,p)= 0 $. We want to minimize some scalar function of the state of the system $J(u(p),p)$ respect to $$p$$. When the number of $$p$$ is large, the naive calculation of $\partial_{p}u$ is intractable, so we formulate another additional system, the adjoint system, that help us to calculate $$d{p}J$$ by only taking into account the direction of change of $$u$$ that $$J$$, is most sensitive to, $$\partial_{u}J$$.
+We have some system (dynamical system, neural network, spatial PDE...) with state $$u(p,x)$$ , whose response to an external input is expressed implicitly as a function $$g(u,p)= 0 $$.
 
-Let's assume for simplicity that $$u(p)$$ and $$p$$ are arrays of dimension $$N_{u} \quad N_{p} $$ and $$J$$ doesn't depends explicitely on p ( if it does it is just adding the $$\partial_{p}J$$ )
+We want to minimize some scalar function of the state of the system $$J(u(p),p)$$ respect to $$p$$. When the number of $$p$$ is large, the naive calculation of $$\partial_{p}u$$ is intractable, so we write down  another auxiliary additional system, the adjoint system, that help us to calculate $$d_{p}J$$ by only taking into account the direction of change of $$u$$ that $$J$$, is most sensitive to, $$\partial_{u}J$$.
+
+Let's assume for simplicity that $$u(p)$$ and $$p$$ are arrays of dimension $$N_{u},N_{p} $$ and $$J$$ doesn't depends
+explicitly on $$p$$ ( if it does we just need to add the $$\partial_{p}J$$ term in the final expression).
 
 <div>
 
 \begin{array}{l}
 
-\underset{p}{argmin}J(p) \\
+\underset{p}{argmin} \quad J(p) \\
 subject \quad to \quad g(u,p) = 0\\
 \end{array}
 
 </div>
 
-Finding the adjoint equation, the system we have to solve becomes
+Let's write down the  adjoint equation we derivated earlier
 
 <div>
 
 \begin{array}{l}
 
 \underset{p}{argmin}J(p) \\
-
-subject \quad to \quad \partial_{u}J(u(p),p) = \partial_{u}g^{T}(u,p)\lambda \\
-subject \quad to \quad g(u,p) = 0
+subject \quad to \quad g(u,p) = 0 \\
+\quad to \quad \partial_{u}J(u(p),p) = \partial_{u}g^{T}(u,p)\lambda
 \end{array}
 
+</div>
 
-
-where $$\lambda$$ is an array of the same dimension as $$u$$
+where $$\lambda$$ is an array of the same dimension as $$u$$.
 
 Once we solve this system, $$d_{p}J$$ is just $$-\lambda^{T}\partial_{p}g$$.
 
 To solve the adjoint system we first have to solve the forward system, once we get the value of $$u$$, for some $$p$$, we can get $$\partial_{u}g^{T}(u,p)$$ and $$\partial_{u}J$$, with this, we can solve the adjoint system.
-</div>
 
-In the next sections we'll formulate the specific adjoint system we get for systems of different structure, with notable examples of each one, $$u$$ and $$p$$ are vectors that obey some general non linear equation $$g(u,p)= 0$$,(discretized spatial pde, present example), evolutive discrete systems, where $$u_{k} = f(u_{k-1},p)$$ (feedforward NN, discretized Ode), time continuous   $$u(t,p)$$ evaluated on a continuous trajectory ( optimal control), time continuous $$u(t,p)$$ evaluated on discrete datapoints ( Odenet, Fitting Ode parameters).
+Once the insight of the method has been understood, the specific derivation of the different types of states $$u$$ and parameters $$p$$ (discrete recurrent case, the continuous case ...) will be mostly mechanical, and is extended in the appendix, in order not to clutter the main flow of the post,  using the  more formal approach of Lagrange multipliers.
+
+In the next section I'll write down the specific adjoint system we get for systems of different structure that cover the most usual cases, with notable examples of each one, these are:
+
+  * $$u$$ and $$p$$ are vectors that obey some general non linear equation $$g(u,p)= 0$$ ( this is the case covered so far, e.g discretized spatial pde).
+  * $$u$$ is the state of a recurrent discrete system , where $$u_{k} = f(u_{k-1},p)$$ (e.g feedforward NN, discretized ODE).
+  * $$u(t,p)$$ is a function of time, and $$J$$ is evaluated on a continuous trajectory (e.g optimal control).
+  * $$u(t,p)$$ is a function of time, and $$J$$ evaluated on discrete datapoints (eg. ODEnet, Fitting ODE parameters).
 
 
 
-## All systems
+
+
+
+## Adjoint cheat sheet
 
 The general problem we will be solving is finding the parameters $$P$$ that minimize a function/functional $$J$$ of the state $$X$$, subject to a state equation $$G$$
 
@@ -249,21 +305,15 @@ Where X and P might be scalars, vectors, time dependent functions...
 
 
 
+For the continuous case where $$u$$ is a function of time, the following notation is used
 <div>
 \begin{array}{l}
      t_{0} = 0 \rightarrow \mbox{initial time} \\
      T_{f} = T \rightarrow \mbox{final_time}\\
      \quad \tau = T-t \\
 \end{array}
-
-\begin{equation}
-    J:X \times P \rightarrow \Re
-\end{equation}
-
-\begin{equation}
-     G:X \times P \rightarrow X
-\end{equation}
 </div>
+Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoint ODE.
 
 
 <div class = "container">
@@ -273,7 +323,7 @@ Where X and P might be scalars, vectors, time dependent functions...
     <tr>
         <th width="10%"> $$u$$ </th>
         <th width="45%">$$\Re^{N_{u}}$$ e.g Discretized spatial PDE</th>
-        <th width="45%">$$\Re^{N_{t}}\times\Re^{N_{u_{k}}}$$ e.g Feed forward NN, discretized Odes </th>
+        <th width="45%">$$\Re^{N_{t}}\times\Re^{N_{u_{k}}}$$ e.g Feed forward NN, discretized ODEs </th>
 
     </tr>
 
@@ -347,7 +397,7 @@ Where X and P might be scalars, vectors, time dependent functions...
     <tr>
       <td width="10%"> $$J$$ </td>
       <td width="45%">$$ J(u(t),p) = \int_{0}^{T} f(u(t),p) \,dt$$ eg. LQR controller, Kalman Filter </td>
-      <td width="45%">$$J(x,p) = \sum_{i}^{{Ndata}}f(x_{data_{i}},\hat{x_{i}},p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{data_{i}},\hat{x_{i}},p) \delta(t_{i}) dt$$ eg. Fitting Ode params, Odenet </td>
+      <td width="45%">$$J(x,p) = \sum_{i}^{{Ndata}}f(x_{data_{i}},\hat{x_{i}},p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{data_{i}},\hat{x_{i}},p) \delta(t_{i}) dt$$ eg. Fitting ODE params, ODEnet </td>
     </tr>
 
     <tr>
@@ -415,17 +465,24 @@ Where X and P might be scalars, vectors, time dependent functions...
 
 </div>
 
-# Examples application
+# Specific applications
 
-## Backpropagation, Feedforward Neural Network
+With this framework, writing down the adjoint equation for different systems is just a matter of sustitution, I'll try to make this more clear with some notable examples, by deriving the **backpropagation algorithm** for feedforward neural networks, **linear dynamical systems**, and **continuous depth Deep Learning, ODEnet**.
+
+## Backpropagation
+
+
+
+To obtain the expression of the backpropagated gradients, we only have to substitute the specific expression of $$g$$ , and use
+the formula of the adjoint system for vector recurrent states.
+
+Training a feedforward neural network can be formulated as the following constrained optimization problem
 
 <div>
 \begin{array}{lc}
 \underset{p}{\mbox{minimize}} & J(x_{data},x_{L},p=W)  \\
 \end{array}
 
-To obtain the expression of the backpropagated gradients, we only have to substitute the specific expression of $$g$$ , and use
-the formula of the adjoint system for vector recurrent states.
 
 \begin{array}{lcm}
 \mbox{forward system} & g(x,W) = 0 = &   \begin{cases}
@@ -452,7 +509,7 @@ the formula of the adjoint system for vector recurrent states.
         -\lambda_{1}^{T}\sigma'(W_{L}x_{0})W_{1}+\lambda_{0}^{T} = 0 \\
         \end{cases} \\
 \end{array}
-
+</div>
 
 So the gradients of the cost function $$J$$ respect to the weights of the $$L-k$$ layer is
 
@@ -461,10 +518,10 @@ So the gradients of the cost function $$J$$ respect to the weights of the $$L-k$
             d_{W_{L-k}} J_{aug} =\lambda_{L-k}^{T}\partial_{W_{L-k}} g_{L-k}=-\lambda_{L-k}^{T}\partial_{W_{L-k}} \sigma(W_{L-k}x_{L-k-1})
     \end{equation}
 \end{array}
-</div>
 
 
-If you were naively taking forward derivatives in the case of a Feedforward neural network or a discretized evolutive PD, you wouldn't need the fancy derivation of the adjoint method  in the context of a constrained optimization problem to realise you are wasting in
+
+If you were taking forward derivatives in the case of a Feedforward neural network or a discretized evolutive PDE, you wouldn't need the fancy derivation of the adjoint method  in the context of a constrained optimization problem to realise you are wasting in
 vane a lot of effort, if $$u_{k}$$ is the state of the forward system at time/layer $$k$$, when you write the expression of the
 gradients of the cost function evaluated at the final time/layer $$T$$ respect to the parameters at the $$k$$ step, you would get a matrix product expression that you can evaluate starting from the right to the left , or starting from the left to the right
 
@@ -477,7 +534,8 @@ gradients of the cost function evaluated at the final time/layer $$T$$ respect t
 </div>
 
 
-Obviously you would go from right to left because the $$\partial_{u_{L}}J$$ is contracting the heavy $$\partial_{p}u$$ matrices into an array, this is we are using vector jacaobian products instead of jacobian vector products
+Obviously you would go from left to right because the $$\partial_{u_{L}}J$$ is contracting the heavy $$\partial_{p}u$$ matrices into an array. In terms of matrix algebra, $$\rightarrow$$ is traversed by doing vector jacobian products, and $$\leftarrow$$ is traversed by doing jacobian vector products, the jacobian vector product answer the question "How much my output change with $$\Delta p$$ perturbations?", while vector jacboian product answers the question "How much a linear functional changes by perturbations $$\Delta p$$?"<sup id="fnref:fn3" role="doc-noteref"><a href="#fn:fn3" class="footnote" rel="footnote">3</a></sup>
+. A more extended, NN focused explanation of this, explained neately
 
 
 
@@ -489,10 +547,9 @@ Obviously you would go from right to left because the $$\partial_{u_{L}}J$$ is c
 
 
 
+## Linear dynamical systems
 
-## Example adjoint, linear system
-
-It is interesting  to work the case of fitting a data point on the end of the trajectory of a linear ode system, because being able to write down the analytical expression
+It is interesting  to work the case of fitting a data point on the end of the trajectory of a linear ODE system, because being able to write down the analytical expression
 can give some useful insights about the relation of the forward adjoint dynamics.
 <div>
 \begin{equation}
@@ -526,9 +583,13 @@ We just have to use the formula for the continuous case evaluated on discrete da
                         \end{cases}
 \end{array}
 
+</div>
+
 The solutions to both systems are matrix exponentials with coefficients being $$A$$ in the forward system and $$A^{T}$$ in the backward system, this means that the
 exploding/vanishing trends will be the same, but they'll rotate in opposing directions
 
+
+<div>
 
 \begin{array}{lm}
 \mbox{solution forward} & \begin{cases}
@@ -542,27 +603,28 @@ exploding/vanishing trends will be the same, but they'll rotate in opposing dire
                           \end{cases}
 \end{array}
 
+</div>
 The forward system will propagate forward $$x_{0}$$ with $$e^{pAt}$$ and, the adjoint system will propagate $$\partial_{x}f|_{T}$$ backwards
 
-
+<div>
 \begin{array}{lm}
 \mbox{Gradient = $d_{p} J(x,p)$ = } & \begin{cases}
             \int_{\tau = 0}^{\tau = T} (e^{pA^{T}\tau}2(x_{T}-\hat{x}(\tau = 0,p)))(A\hat{x}(\tau))d\tau
                 \end{cases}
 \end{array}
 
-
 </div>
 
 
 
-## Example Continuous-limit Deep Learning, Odenet
+
+##  Continuous-depth limit Deep Learning, ODEnet
 
 
 
-Extending the number of layers of a feedforward neural network to the continuous limit, is essentially the same that moving from a discrete ODE system scheme to its continuous expression.
+Extending the number of layers of a feedforward neural network to the continuous limit<sup id="fnref:fn5" role="doc-noteref"><a href="#fn:fn5" class="footnote" rel="footnote">5</a></sup>, is essentially the same than moving from a discrete ODE system scheme to its continuous expression.
 
-To make the analogy, NN/Ode more explicit, let's compare a basic feedforward neural network with the euler discretization of a linear dynamical system.
+To make the analogy, NN/ode more explicit, let's compare a basic feedforward neural network with the euler discretization of a linear dynamical system.
 <div>
 \begin{array}{lcmsd}
 \mbox{forward system} & g(x,W) = 0 = &   \begin{cases}
@@ -581,11 +643,11 @@ To make the analogy, NN/Ode more explicit, let's compare a basic feedforward neu
        x_{0}-x_{input} = 0
        \end{cases} \\
 \end{array}
+</div>
 
+If we employ a more widespread variant of NN, that employ skip connections, *Resnets*, the resemblance  is even more striking,
 
-If we employ a more widespread variant of NN, that employ skip connections, resnets, the resemblance  is even more striking,
-
-
+<div>
 \begin{array}{lcms}
 \mbox{forward system}  &   \begin{cases}
        x_{L} = \sigma(W_{L}x_{L-1})   \\
@@ -605,12 +667,6 @@ If we employ a more widespread variant of NN, that employ skip connections, resn
 \end{array}
 
 
-\begin{eqnarray}
-\partial_{x_{L-k}}J=\partial_{x_{L}}J\sigma'(z_{L})W_{L}\sigma'(z_{L-1})W_{L-1}\ldots\sigma'(z_{L-k+1})W_{L-1k+1} \rightarrow\\
- \rightarrow  \partial_{x_{L-k}}J=\partial_{x_{L}}J(\sigma'(z_{L})W_{L}+\mathbb 1)(\sigma'(z_{L-1})W_{L-1}+\mathbb \\ 1)\ldots(\sigma'(z_{L-k+1})W_{L-k+1}+\mathbb 1)
-\end{eqnarray}
-
-</div>
 
 
 Adding more layers to a resnet, with increansingly smaller steps, the network state evolution equation,
@@ -622,8 +678,8 @@ Taking this to the limit of small steps, we can parametrize the continuous dynam
 \begin{equation}
 \dot{x} = A(x,\theta)
 \end{equation}
-Now the gradients must be calculated using the continuous formulation of the adjoint method, and the forward and backward passes are calculated with regular ode solvers.
-
+Now the gradients must be calculated using the continuous formulation of the adjoint method, and the forward and backward passes are calculated with regular ODE solvers.
+</div>
 
 <div>
 
@@ -684,20 +740,21 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{Data},x(t=T,p,x_{input}))\delta(T) 
 
 
 
-## Solving the Adjoint problem for "free" with autodiff libraries, backwards differentiation
+## Solving the Adjoint problem for "free" with automatic differentiation libraries
 
+Usually, if we are optimizing over a simulation or a neural network,  we won't have to formulate the adjoint system explicetily, it will be built automatically by the software once the forward pass has been defined, provided that all the operations in the forward pass are compatible with the automatic differentiation engine of the framework.
 
-One of the most basic that autodiff libraries implement is the vector jacobian product, wich allow us to backpropagate  the gradient of a scalar function backwards to the weights.
-This is like the automatic calculation of the adjoint state for discrete explicit systems shown before, but nowadays more libraries implement the automatic calculation
-of all the variants of the adjoint method discussed here. Even simulation frameworks such as FeniCS, implement the automatic calculation of the adjoint state, so we rarely have to
-care to implement it unless is a very specific odd case.
+One of the most basic operations that automatic differentiation  libraries implement is the *vector jacobian*, $$v^TW$$, product,  which allow us to backpropagate  the gradient of a scalar function backwards to the weights in the case of explicit layers (most NN use explicit layers).
 
-Here I'll show an example of the solution of the forward and backward problem for the analytically solved linear system before, employing in pytorch a rungekutta scheme as our "layer",
+Most of these libraries nowadays have implemented the different variants of the adjoint system discussed here, even simulation frameworks such as *FeniCS*, implement the automatic calculation of the adjoint state, so we rarely have to care to implement it.
+
+Here I'll show an example of the solution of the forward and backward problem for the analytically solved linear system before, implementing a *Runge-Kutta* scheme in pytorch that we can think of as our *layer*,
 to compute the forward system.
 
-Of course this is only used for demonstration porpuses, we should use the continous implementation of the adjoint wich is discretization independent, and can handle implicit schemes.
+Of course this is only used for demonstration purposes, we should use the continuous implementation of the adjoint which is discretization independent, and can handle implicit schemes<sup id="fnref:fn4" role="doc-noteref"><a href="#fn:fn4" class="footnote" rel="footnote">4</a></sup>.
 
-'''
+
+```python
 
 def make_system():
 
@@ -717,7 +774,13 @@ def make_system():
 
     return system, params
 
+```
 
+
+Pytorch just build a graph when we recurrently calculate the solution of the forward problem, used to calculate the gradient that propagates backwards
+
+
+```python
 def _rk4_step(fun, yk, tk, h):
 
     k1 = fun(yk, tk)
@@ -729,7 +792,6 @@ def _rk4_step(fun, yk, tk, h):
 
     return yk_next
 
-Pytorch just build a graph when we recurrently calculate the solution of the forward problem, used to calculate the gradient that propagates backwards
 def rk4(fun, y0, t, retain_grad = False):
 
     y = []
@@ -748,40 +810,41 @@ def rk4(fun, y0, t, retain_grad = False):
         y.append(yk)
 
     return y
-
+```
 
 The forward pass is the solution of our system for a given input/forcing....
 
+
+
+```python
 def forward_pass(x0,T, system):
 
     out = rk4(system, x0, T, retain_grad = True)
 
     return out
 
+...
 
 
 
 
-We solve the forward problem
-
-  out = forward_pass(x0, T, system)
-
-Here we just concatenate all the outputs at the datapoints of interest
-
-  xpred = torch.cat([out[i] for i in indices_data], dim = 0)
-
-We  calculate the loss
-
-  loss = torch.mean( torch.square(xpred-xdata))
-
-  We slve the adjoint problem
-
-
-  loss.backward()
+  out = forward_pass(x0, T, system)  #We solve the forward problem g(u,p) = 0, in this case a explicit system
 
 
 
-'''
+  xpred = torch.cat([out[i] for i in indices_data], dim = 0)  #Here we just concatenate all the outputs at the datapoints of interest
+
+
+
+J = torch.mean( torch.square(xpred-xdata))   #We  calculate the loss J
+
+
+
+
+J.backward()  #We slve the adjoint problem , the gradients are stored in the different p, and then used by the optim
+
+```
+
 
 One data point start
 
@@ -805,14 +868,14 @@ More than one data point
 
 </div>
 
-
+## Paring words, dynamical systems and ODEnets
 
 
 # Appendix
 
 
 
-## General derivation for vector states
+## Derivation for vector states
 
 <div>
 \begin{array}{lc}
@@ -865,7 +928,7 @@ There is a more practical and general derivation of the adjoint method, that is 
 
 
 
-Taking derivatives respect to the parameter $p$ of the augmented function, and getting common factor $$\partial_{p}x$$, we arrive at
+Taking derivatives respect to the parameter $$p$$ of the augmented function, and getting common factor $$\partial_{p}x$$, we arrive at
 
 \begin{equation}
 d_{p}J_{aug} = \partial_{p}f+\partial_{x}f\partial_{p}x+\lambda^{T}(\partial_{p}g+\partial_{x}g\partial_p{x})
@@ -884,7 +947,7 @@ Now, we exercise our freedom of choice for $$\lambda^{T}$$ and choose such, that
 
 
 
-## Derivation for the specific case of state systems with coherent sequential structure.
+## Derivation for discrete recurrent systems (e.g FF NN, discretized ODE)
 
 
 Such as in the case of neural networks, and dynamical systems, we are specially interested in systems, where the state is transformed sequentially. Let's assume for simplicity that the system  is evaluated at its final stage, last layer in a nn, final position in a control problem.
@@ -991,10 +1054,10 @@ It is worth noting, that this is just a more formal reformulation of the algorit
 \end{array}
 </div>
 
-## Derivation of the adjoint method for  time dependent states
+## Derivation for time dependent states
 
 
-Now let's deal with the case where the state is a time dependent function, this would be the problem we would have, for instance,  in optimal control or trying to fit the parameters of an ode to data.
+Now let's deal with the case where the state is a time dependent function, this would be the problem we would have, for instance,  in optimal control or trying to fit the parameters of an ODE to data.
 
 <div>
 \begin{array}{lc}
@@ -1071,7 +1134,8 @@ Let's build the augmented objective function by plugging the constraints with th
  \end{array}
 </div>
 
- By making zero the term that accompanies $$\partial_{p}x$$ in the integral, we arrive at the continuous adjoint system, we change time variables so the system is integrated backwards from $$\tau|^{T}_{0}$$.
+By making zero the term that accompanies $$\partial_{p}x$$ in the integral, we arrive at the continuous adjoint system,
+ we change time variables so the system is integrated backwards from $$\tau|_{T_{0}}$$.
 
 
 <div>
@@ -1101,15 +1165,20 @@ Let's build the augmented objective function by plugging the constraints with th
 It is worth noting that discretizing this system, we arrive at the set of equations of last section
 
 
-## Data evaluated at discrete times
+## Time dependent states with data evaluated at discrete times
+
+In the case of ODEnet or fitting a ODE to data, our cost function $$J$$ usually will be evaluated on discrete datapoints, that enter in the integral of the last section as *dirac deltas*, and appear in the RHS of
+the adjoint equation. When we have an ODE with $$\delta$$ as source terms, is like a sudden impulse that makes the solution of the ODE jump, presenting a discontinuity.
+
+To solve the adjoint system we'd have to solve seperatelly the sections between datapoints,adding  the *jump* at the end of a piece, then this will  act as the initial condition for the next piece.
 
 <div>
 \begin{equation}
-J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(t_{i}) dt
+J(x,p) = \int_{0}^{T} \sum_{i}^{Ndata}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(t_{i}) dt
 \end{equation}
 
 \begin{equation}
-\partial_{x}f = -2\sum_{i}^{{Ndata}}(x_{t_{i}}-\hat{x}(t_{i},p)) \delta(t_{i})
+\partial_{x}f = -2\sum_{i}^{Ndata}(x_{t_{i}}-\hat{x}(t_{i},p)) \delta(t_{i})
 \end{equation}
 
 
@@ -1120,4 +1189,46 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(
 \begin{equation}
 \lambda(\tau_{i}^{+})-\lambda(\tau_{i}^{-}) = -A(x_{data},\hat{x}) = 2(x_{t_{i}}-\hat{x}(t_{i},p))
 \end{equation}
+</div>
+
+
+
+
+
+<h2 id="footnotes">Footnotes</h2>
+
+<div class="footnotes" role="doc-endnotes">
+  <ol>
+
+      <li>
+         <p> PDE-constrained optimization and the adjoint method
+         <a href="https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf">https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf</a>
+          </p>
+      </li>
+
+      <li id="fn:fn2" role="doc-endnote">
+       <p> Brief, nice and practical explanation of the adjoint calculation for Function operators among many other things </p>
+        <p>J. Nathan Kutz <a href="https://arxiv.org/abs/2012.14591">Advanced Differential Equations: Asymptotics & Perturbations
+        </a><a href="#fnref:fn2" class="reversefootnote" role="doc-backlink">↩</a></p>
+      </li>
+
+      <li id="fn:fn3" role="doc-endnote">
+      <p> Neat, great and extended explanation of this in the context of NNs.</p>
+        <p> Zico Kolter, David Duvenaud, Matt Johnson<a href="http://implicit-layers-tutorial.org/">  Deep Implicit Layers - Neural ODEs, Deep Equilibirum Models, and Beyonds</a><a href="#fnref:fn3" class="reversefootnote" role="doc-backlink">↩</a></p>
+      </li>
+
+      <li id="fn:fn4" role="doc-endnote">
+      <p> Pytorch implementation of the adjoint method for continuous states.</p>
+        <a href="https://github.com/rtqichen/torchdiffeq">  https://github.com/rtqichen/torchdiffeq</a><a href="#fnref:fn4" class="reversefootnote" role="doc-backlink">↩</a>
+      </li>
+
+      <li id="fn:fn5" role="doc-endnote">
+      <p> Neat, great and extended explanation of this in the context of NN</p>
+        <p> Ricky T. Q. Chen, Yulia Rubanova, Jesse Bettencourt, David Duvenaud<a href="https://arxiv.org/abs/1806.07366"> Neural Ordinary Differential Equations</a><a href="#fnref:fn5" class="reversefootnote" role="doc-backlink">↩</a></p>
+      </li>
+
+
+    </ol>
+
+
 </div>
