@@ -14,16 +14,20 @@ permalink: /posts/adjoint/
 
 Broadly speaking, the adjoint method is a method to efficiently calculate gradients of scalar functions in constrained optimization problems with many parameters.
 
- Fitting the parameters of an evolutive system, optimal control, inverse problems, all use the same mathematical backbone to calculate the cost function gradients with respect to the parameters. Depending on the specific structure of cost function and the system to solve  ( continuous/discrete, evolutive...), different ad-hoc implementations have been implemented in different disciplines, with their own naming and algorithms. Control applications sometimes name it the coestate, in Deep Learning it is called Backpropagation, in ODE analysis is often cited as Sensitivity Analysis...
+ Fitting the parameters of an evolutive system, optimal control, inverse problems, all use the same mathematical backbone to calculate the cost function gradients with respect to the parameters. Depending on the specific structure of cost function and the system to solve  ( continuous/discrete, evolutive...), different ad-hoc implementations have been implemented in different disciplines, with their own naming and algorithms. Control applications sometimes name it the costate, in Deep Learning it is called Backpropagation, sometimes is agglutinated inside Sensitivity Analysis...
 
-So,  it might be hard to understand at first  how all these different methods, across these different disciplines, share the same underground mathematical formulation. Besides, there are some very arcane explanations around, not offering any intuitive insight, usually fit to the specific application at hand, and even if the difference between the formulation of two different problem is just cosmetic, it might be hard to identify them as the same mathematical entity.  
+So,  it might be hard to understand at first  how all these different methods, across these different disciplines, share the same underground mathematical formulation. Besides, in many explanations around, I didn't find any intuitive insight, and they are usually oriented to specific problems, so, even if the difference between some formulations across different disciplines, are just cosmetic, it might be hard to identify them as the same mathematical entity.
+
+Having a background in physics and applied math, I first encountered the Adjoint Method in the context of Sensitivity Analysis, Inverse problems, Optimal control... as a *trick* to efficiently calculate gradients. Later when I delved a little into Deep Learning stuff, with things such as *Backpropagation*,*Reverse mode differentiation*...,  it took me more time that I'd like to admit to tie it all together with my previous knowledge. So I'd like to try to ease that journey to people that follow a similar path by  motivating and formulating the adjoint method from the standpoint of Applied Mathematics, and  detailing later the specific applications in different domains, including Deep Learning, so they can serve as well as a *cheat sheet* for quick consulting.
+
+
 
 
 # Motivation
 
 Let's say we have a system that depends on some parameters $$p$$ and some input $$x$$, producing some output $$u$$.
 
-Evaluating that model requires solving the so called  **forward problem**, e.g, if our system is the ODE describing the movement of a damped pendulum, the forward pass will consist in plugging some forcing/impulse term on the RHS,  and integrate the equations to evaluate the output u(t,p). If our system is a feed-forward neural net, the forward pass will be calculated by feeding the net some data, propagate it and getting some output $$y(x,p)$$.
+Evaluating that model requires solving the so called  **forward problem**, e.g, if our system is the ODE describing the movement of a damped pendulum, the forward pass will consist in plugging some forcing/impulse term on the RHS,  and integrate the equations to evaluate the output u(t,p). If our system is a feed-forward neural net, the forward pass will be calculated by feeding the net some data, propagate it and getting some output $$u(data,p)$$.
 
 Many times, we need to travel in the opposite direction, this means, we must solve the inverse problem that answers the question, "which are the inputs/parameters that generate this output", this usually involves solving some constrained optimization problem and propagating information in the backward direction, which comprises the **backward problem**.
 
@@ -49,15 +53,15 @@ Many times, we need to travel in the opposite direction, this means, we must sol
 
       <div>
       \begin{array}{lc}
-      \mbox{J}: \underset{p}{\mbox{minimize}} & \sum(x_{Data}-\hat{x}(x_{input},p))^{2}  \\
+      \mbox{J}: \underset{p}{\mbox{minimize}} & \sum(u_{Data}-(\hat{u}(x_{input},p))^{2}  \\
       \end{array}
       \begin{array}{lm}
       \mbox{G}: &   \begin{cases}
-            \hat{x} = \sigma(Wx_{k})  \\
-            x_{k} = \sigma(W_{k}x_{k-1}) \\
+            \hat{u} = \sigma(Wu_{k})  \\
+            u_{k} = \sigma(W_{k}u_{k-1}) \\
             \vdots \\
-            x_{2} = \sigma(W_{2}x_{1})\\
-            x_{1} = \sigma(W_{1}x_{input}) \\
+            u_{2} = \sigma(W_{2}u_{1})\\
+            u_{1} = \sigma(W_{1}u_{input}) \\
          \end{cases} \\
       \end{array}
       </div>
@@ -71,11 +75,11 @@ Many times, we need to travel in the opposite direction, this means, we must sol
 
       <div>
       \begin{array}{lc}
-      \mbox{J}: \int_{0}^{tf}1/2(x^{*}Qx+u^{*}Ru)d\tau \\
+      \mbox{J}: \int_{0}^{tf}1/2(u^{*}Qu+p^{*}Rp)d\tau \\
       \end{array}
 
       \begin{array}{lm}
-      \mbox{G}: & \dot{x} = Ax+Bu
+      \mbox{G}: & \dot{u} = Au+Bp
       \end{array}
       </div>
 
@@ -87,11 +91,11 @@ Many times, we need to travel in the opposite direction, this means, we must sol
 
       <div>
       \begin{array}{lc}
-      \mbox{J}: \sum_{sensor data} ||x_{jreading,\tau}-x_{j}(t=\tau)||^{2}   \\
+      \mbox{J}: \sum_{sensor data} ||u_{jreading,\tau}-u_{j}(t=\tau)||^{2}   \\
       \end{array}
 
       \begin{array}{lm}
-      \mbox{G}: & \ddot{x} = A(m)x+b(m) \\
+      \mbox{G}: & \ddot{u} = A(m)u+b(m) \\
       I.C & B.C
       \end{array}
       </div>
@@ -124,14 +128,14 @@ The temperature profile will be modelled by some Reaction-Diffusion equation wit
 \begin{array}{l}
 
 \underset{p}{argmin}J(p) = \sum_{D}(u_{ijD}-u(p,x_{i}, y{j})) \\
-subject \quad to \quad g(x,y,p) = D\partial_{x}^{2}u + \sigma u - C\sum^{N_{p}} p_{ij}\delta(x_{i},y_{j}) = 0\\
+subject \quad to \quad g(u(x,y),p) = D\partial_{x}^{2}u + \sigma u - C\sum^{N_{p}} p_{ij}\delta(x_{i},y_{j}) = 0\\
 B.C
 
 \end{array}
 
 
 
-Let's work with the discretized version of the system to avoid now the unnecesary complications of functional calculus at this time.
+Let's work with the discretized version of the system to avoid now the unnecesary complications of functional analysis at this time.
 
 
 \begin{array}{l}
@@ -193,7 +197,7 @@ The $$d_{p}J$$ increments due to perturbations of the parameters $$\Delta p$$ is
 <div>
 
 \begin{array}{l}
-dJ(p) = <\partial_{u}J, \partial_{p}u \Delta p> = <\partial_{u}J, \partial_{u}g^{-1}\partial_{p}g \Delta p>
+dJ(p) = <\partial_{u}J, \partial_{p}u \Delta p> = <\partial_{u}J, -\partial_{u}g^{-1}\partial_{p}g \Delta p>
 \end{array}
 
 </div>
@@ -211,12 +215,12 @@ dJ(p) = <\partial_{u}J, -\partial_{u}g^{-1}\partial_{p}g \Delta p> = <( -\partia
 \end{array}
 </div>
 
-The thing on the left is our variable of interest, $$\partial_{p}J$$, but expressed like that, it doesn't look that we've made any advance, but there is in fact a linear system in disguise there, of only $$N_{u}$$ unknowns. We can avoid solving  $$\partial_{u}g\partial_{p}u = -\partial_{p}g$$ with $$N_{u} \times N_{p}$$ unkowns, and unfold the much smaller system of $$N_{u}$$ unknowns by setting the term $$\partial_{u}J^{T}\partial_{u}g^{-1}$$ to some unkown variable $$\lambda$$ of $$N_{u}$$ dimensions.
+The thing on the left is our variable of interest, $$\partial_{p}J$$, but expressed like that, it doesn't look that we've made any advance, but there is in fact a linear system in disguise there, of only $$N_{u}$$ unknowns. We can avoid solving  $$\partial_{u}g\partial_{p}u = -\partial_{p}g$$ with $$N_{u} \times N_{p}$$ unkowns, and unfold the much smaller system of $$N_{u}$$ unknowns by setting the term $$\partial_{u}J^{T}\partial_{u}g^{-1}$$ to some unknown variable $$\lambda$$ of $$N_{u}$$ dimensions.
 
 <div>
 \begin{array}{l}
-\partial_{u}J^{T}\partial_{u}g^{-1} = \lambda^{T} \\
-\partial_{u}J = \partial_{u}g^{T}\lambda
+-\partial_{u}J\partial_{u}g^{-1} = \lambda^{T} \\
+-\partial_{u}J^{T} = \partial_{u}g^{T}\lambda
 \end{array}
 </div>
 
@@ -227,7 +231,7 @@ Once we find the adjoint $$\lambda$$ , $$\partial_{p}J$$ is just calculated by s
 <div>
 \begin{equation}
 
-<-\partial_{p}g^{T}\lambda,  \Delta p> = <\partial_{p}J,\Delta p> \rightarrow \partial_{p}J = -\lambda^{T}\partial_{p}g
+<\partial_{p}g^{T}\lambda,  \Delta p> = <\partial_{p}J,\Delta p> \rightarrow d_{p}J = \lambda^{T}\partial_{p}g
 
 \end{equation}
 
@@ -235,7 +239,7 @@ Once we find the adjoint $$\lambda$$ , $$\partial_{p}J$$ is just calculated by s
 
 
 
-## Putting it all together
+## Tying it all together
 
 Let's summarize the case problem and the application of the adjoint method.
 
@@ -264,14 +268,14 @@ Let's write down the  adjoint equation we derivated earlier
 
 \underset{p}{argmin}J(p) \\
 subject \quad to \quad g(u,p) = 0 \\
-\quad to \quad \partial_{u}J(u(p),p) = \partial_{u}g^{T}(u,p)\lambda
+\quad to \quad \partial_{u}J(u(p),p) = -\partial_{u}g^{T}(u,p)\lambda
 \end{array}
 
 </div>
 
 where $$\lambda$$ is an array of the same dimension as $$u$$.
 
-Once we solve this system, $$d_{p}J$$ is just $$-\lambda^{T}\partial_{p}g$$.
+Once we solve this system, $$d_{p}J$$ is just $$\lambda^{T}\partial_{p}g$$.
 
 To solve the adjoint system we first have to solve the forward system, once we get the value of $$u$$, for some $$p$$, we can get $$\partial_{u}g^{T}(u,p)$$ and $$\partial_{u}J$$, with this, we can solve the adjoint system.
 
@@ -323,7 +327,7 @@ Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoi
     <tr>
         <th width="10%"> $$u$$ </th>
         <th width="45%">$$\Re^{N_{u}}$$ e.g Discretized spatial PDE</th>
-        <th width="45%">$$\Re^{N_{t}}\times\Re^{N_{u_{k}}}$$ e.g Feed forward NN, discretized ODEs </th>
+        <th width="45%">$$\Re^{N_{t}}\times\Re^{N_{u_{k}}}$$ e.g Recurrent NN, discretized ODEs </th>
 
     </tr>
 
@@ -353,7 +357,7 @@ Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoi
 
     <tr>
       <td width="10%">Adjoint/backward system</td>
-      <td width="45%">$$\partial_{u}J(u(p),p) = \partial_{u}g^{T}(u,p)\lambda$$</td>
+      <td width="45%">$$\partial_{u}J(u(p),p)^{T} = -\partial_{u}g^{T}(u,p)\lambda$$</td>
       <td width="45%">
 
         \begin{array}{l}
@@ -369,7 +373,7 @@ Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoi
 
     <tr>
       <td width="10%">$$d_{p}J$$</td>
-      <td width="45%"> $$d_{p}J = -\lambda^{T}\partial_{p}g$$ </td>
+      <td width="45%"> $$d_{p}J = \partial_{p}J+\lambda^{T}\partial_{p}g $$ </td>
       <td width="45%">
         \begin{array}{l}
               d_{p} J_{aug} = \partial_{p} J + \\
@@ -385,7 +389,7 @@ Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoi
 
 
 
-<h3> Continous state </h3>
+<h3> Continuous state </h3>
 <table>
     <tr>
         <th width="10%"> $$u$$ </th>
@@ -405,15 +409,15 @@ Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoi
       <td width="45%">
         \begin{array}{l}
 
-            g(\dot{x},x,p) = 0  \\
-            g_{0}(x_{0},p) = 0
+            g(\dot{u}(t),u(t),p) = 0  \\
+            g_{0}(u_{0},p) = 0
 
       \end{array} </td>
       <td width="45%">
 
         \begin{array}{l}
-            g(\dot{x},x,p) = 0  \\
-            g_{0}(x_{0},p) = 0
+            g(\dot{u},u,p) = 0  \\
+            g_{0}(u_{0},p) = 0
 
         \end{array}
 
@@ -425,18 +429,18 @@ Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoi
       <td width="45%">
 
         \begin{array}{l}
-           \dot{\lambda(\tau)}\partial_{\dot{u}}g - \lambda(\tau)\dot{\partial_{\dot{u}}}g + \lambda(\tau)\partial_{u}g = -\partial_{u}f  \\
+           \dot{\lambda(\tau)^{T}}\partial_{\dot{u}}g - \lambda(\tau)^{T}\dot{\partial_{\dot{u}}}g + \lambda(\tau)^{T}\partial_{u}g = -\partial_{u}f  \\
            \lambda(\tau = 0) = 0 \\
-            \mu=\lambda\partial_{\dot{u}}g\partial_{u}g_{0}^{-1}
+            \mu=\lambda^{T}\partial_{\dot{u}}g\partial_{u}g_{0}^{-1}
       \end{array}
 
     </td>
       <td width="45%">
 
         \begin{array}{l}
-            \dot{\lambda(\tau)}\partial_{\dot{x}}g - \lambda(\tau)\dot{\partial_{\dot{x}}}g + \lambda(\tau)\partial_{x}g = 0  \\
+            \dot{\lambda(\tau)^{T}}\partial_{\dot{x}}g - \lambda(\tau)^{T}\dot{\partial_{\dot{x}}}g + \lambda(\tau)^{T}\partial_{x}g = 0  \\
              \lambda(\tau_{i}) = -\partial_{x}f|_{\tau_{i}} \\
-              \mu=\lambda\partial_{\dot{x}}g\partial_{x}g_{0}^{-1}
+              \mu=\lambda^{T}\partial_{\dot{x}}g\partial_{x}g_{0}^{-1}
         \end{array}
 
     </td>
@@ -448,14 +452,14 @@ Here $$\tau$$ is the reversed time variable that we use to parametrize the adjoi
       <td width="45%">
         \begin{array}{l}
 
-       d_{p}J = \int_{0}^{T}  \partial_{p}f+\lambda\partial_{p}gdt+\mu\partial_{p}g_{0}\Bigr|_{t = 0}
+       d_{p}J = \int_{0}^{T}  \partial_{p}f+\lambda^{T}(\tau)\partial_{p}gdt+\mu\partial_{p}g_{0}\Bigr|_{t = 0}
 
 
       \end{array}
      </td>
       <td width="45%">
         \begin{array}{l}
-         d_{p}J = \int_{0}^{T}  \partial_{p}f+\lambda\partial_{p}gdt+\mu\partial_{p}g_{0}\Bigr|_{t = 0}
+         d_{p}J = \int_{0}^{T}  \partial_{p}f+\lambda^{T}(\tau)\partial_{p}gdt+\mu\partial_{p}g_{0}\Bigr|_{t = 0}
         \end{array}
     </td>
     </tr>
@@ -480,33 +484,33 @@ Training a feedforward neural network can be formulated as the following constra
 
 <div>
 \begin{array}{lc}
-\underset{p}{\mbox{minimize}} & J(x_{data},x_{L},p=W)  \\
+\underset{p}{\mbox{minimize}} & J(u_{data},u_{L},p=W)  \\
 \end{array}
 
 
 \begin{array}{lcm}
-\mbox{forward system} & g(x,W) = 0 = &   \begin{cases}
-      g(x_{L},x_{L-1},p) = x_{L}-\sigma(W_{L}x_{L-1}) = 0  \\
-      g(x_{L-1},x_{L-2},p) = x_{L-1}-\sigma(W_{L-1}x_{L-2}) = 0 \\
+\mbox{forward system} & g(u,W) = 0 = &   \begin{cases}
+      g(u_{L},u_{L-1},p) = u_{L}-\sigma(W_{L}u_{L-1}) = 0  \\
+      g(u_{L-1},u_{L-2},p) = u_{L-1}-\sigma(W_{L-1}u_{L-2}) = 0 \\
       \vdots \\
-      g(x_{2},x_{1},p) = x_{2}-\sigma(W_{2}x_{1}) = 0\\
-      g(x_{1},x_{0},p) = x_{1}-\sigma(W_{1}x_{0}) = 0 \\
-      g(x_{0},p) = x_{0}-x_{input} = 0
+      g(u_{2},u_{1},p) = u_{2}-\sigma(W_{2}u_{1}) = 0\\
+      g(u_{1},u_{0},p) = u_{1}-\sigma(W_{1}u_{0}) = 0 \\
+      g(u_{0},p) = u_{0}-u_{input} = 0
    \end{cases} \\
 \end{array}
 
 
 \begin{array}{lmc}
 \mbox{backward/adjoint system} & \begin{cases}
-        \partial_{x}J+\lambda_{T}^{T}\partial_{x_{T}}g_{T} = 0 \\
-        \lambda_{T}^{T}\partial_{x_{T-1}}g_{T}+\lambda_{T-1}^{T}\partial_{x_{T-1}}g_{T-1} =0 \\
+        \partial_{u}J+\lambda_{T}^{T}\partial_{u_{T}}g_{T} = 0 \\
+        \lambda_{T}^{T}\partial_{u_{T-1}}g_{T}+\lambda_{T-1}^{T}\partial_{u_{T-1}}g_{T-1} =0 \\
         \vdots \\
-        \lambda_{1}^{T}\partial_{x_{0}}g_{1}+\lambda_{0}^{T}\partial_{x_{0}}g_{0} = 0 \\
+        \lambda_{1}^{T}\partial_{u_{0}}g_{1}+\lambda_{0}^{T}\partial_{u_{0}}g_{0} = 0 \\
         \end{cases} & \rightarrow \begin{cases}
-        \partial_{x}J+\lambda_{T}^{T} = 0 \\
-        -\lambda_{T}^{T}\sigma'(W_{L}x_{L-1})W_{L}+\lambda_{T-1}^{T} =0 \\
+        \partial_{u}J+\lambda_{T}^{T} = 0 \\
+        -\lambda_{T}^{T}\sigma'(W_{L}u_{L-1})W_{L}+\lambda_{T-1}^{T} =0 \\
         \vdots \\
-        -\lambda_{1}^{T}\sigma'(W_{L}x_{0})W_{1}+\lambda_{0}^{T} = 0 \\
+        -\lambda_{1}^{T}\sigma'(W_{L}u_{0})W_{1}+\lambda_{0}^{T} = 0 \\
         \end{cases} \\
 \end{array}
 </div>
@@ -553,13 +557,13 @@ It is interesting  to work the case of fitting a data point on the end of the tr
 can give some useful insights about the relation of the forward adjoint dynamics.
 <div>
 \begin{equation}
-J(x,p) = (x_{T}-\hat{x}(T,p))^{2}
+J(u,p) = (u_{T}-\hat{u}(T,p))^{2}
 \end{equation}
 
 \begin{array}{lm}
 \mbox{subject to} & \begin{cases}
-                    \dot{x} = pAx \\
-                    x(t_{0}) = x_{0}
+                    \dot{u} = pAu \\
+                    u(t_{0}) = u_{0}
                     \end{cases}
 \end{array}
 
@@ -567,11 +571,11 @@ J(x,p) = (x_{T}-\hat{x}(T,p))^{2}
 We just have to use the formula for the continuous case evaluated on discrete datapoints and we get the equations
 
 \begin{cases}
-\partial_{\dot{x}}g =  \mathbb 1 \\
-\dot{\partial_{\dot{x}}g} = 0 \\
-\partial_{x}g = -pA \\
-\partial_{p}g = -Ax \\
-\lambda(\tau = 0) = 2(x_{T}-\hat{x}(T,p)) \\
+\partial_{\dot{u}}g =  \mathbb 1 \\
+\dot{\partial_{\dot{u}}g} = 0 \\
+\partial_{u}g = -pA \\
+\partial_{p}g = -Au \\
+\lambda(\tau = 0) = 2(u_{T}-\hat{u}(T,p)) \\
 \mu=\lambda(\tau = T)
 \end{cases}
 
@@ -579,7 +583,7 @@ We just have to use the formula for the continuous case evaluated on discrete da
 \begin{array}{lm}
 \mbox{adjoint system} & \begin{cases}
                         \dot{\lambda^{T}}-\lambda^{T}pA = 0 \\
-                        \lambda^{T}(\tau = 0) = 2(x_{T}-\hat{x}(T,p))
+                        \lambda^{T}(\tau = 0) = 2(u_{T}-\hat{u}(T,p))
                         \end{cases}
 \end{array}
 
@@ -593,23 +597,23 @@ exploding/vanishing trends will be the same, but they'll rotate in opposing dire
 
 \begin{array}{lm}
 \mbox{solution forward} & \begin{cases}
-                          x = e^{pAt}x_{0}
+                          u = e^{pAt}u_{0}
                           \end{cases}
 \end{array}
 
 \begin{array}{lm}
 \mbox{solution adjoint} & \begin{cases}
-                          \lambda = e^{pA^{T}\tau}\lambda_{0} = e^{pA^{T}\tau}2(x_{T}-\hat{x}(T,p))
+                          \lambda = e^{pA^{T}\tau}\lambda_{0} = e^{pA^{T}\tau}2(u_{T}-\hat{u}(T,p))
                           \end{cases}
 \end{array}
 
 </div>
-The forward system will propagate forward $$x_{0}$$ with $$e^{pAt}$$ and, the adjoint system will propagate $$\partial_{x}f|_{T}$$ backwards
+The forward system will propagate forward $$u_{0}$$ with $$e^{pAt}$$ and, the adjoint system will propagate $$\partial_{u}f|_{T}$$ backwards
 
 <div>
 \begin{array}{lm}
-\mbox{Gradient = $d_{p} J(x,p)$ = } & \begin{cases}
-            \int_{\tau = 0}^{\tau = T} (e^{pA^{T}\tau}2(x_{T}-\hat{x}(\tau = 0,p)))(A\hat{x}(\tau))d\tau
+\mbox{Gradient = $d_{p} J(u,p)$ = } & \begin{cases}
+            \int_{\tau = 0}^{\tau = T} (e^{pA^{T}\tau}2(u_{T}-\hat{u}(\tau = 0,p)))(A\hat{u}(\tau))d\tau
                 \end{cases}
 \end{array}
 
@@ -627,20 +631,20 @@ Extending the number of layers of a feedforward neural network to the continuous
 To make the analogy, NN/ode more explicit, let's compare a basic feedforward neural network with the euler discretization of a linear dynamical system.
 <div>
 \begin{array}{lcmsd}
-\mbox{forward system} & g(x,W) = 0 = &   \begin{cases}
-       x_{L}-\sigma(W_{L}x_{L-1}) = 0  \\
-       x_{L-1}-\sigma(W_{L-1}x_{L-2}) = 0 \\
+\mbox{forward system} & g(u,W) = 0 = &   \begin{cases}
+       u_{L}-\sigma(W_{L}u_{L-1}) = 0  \\
+       u_{L-1}-\sigma(W_{L-1}u_{L-2}) = 0 \\
       \vdots \\
-       x_{2}-\sigma(W_{2}x_{1}) = 0\\
-       x_{1}-\sigma(W_{1}x_{0}) = 0 \\
-       x_{0}-x_{input} = 0
-       \end{cases}  & \underset{\sigma(Wx)=(A+\mathbb 1)x}{\rightarrow}  & \begin{cases}
-       x_{T}-(A\Delta t+\mathbb 1)x_{T-1} = 0  \\
-       x_{T-1}-(A\Delta t+\mathbb 1)x_{T-2} = 0 \\
+       u_{2}-\sigma(W_{2}u_{1}) = 0\\
+       u_{1}-\sigma(W_{1}u_{0}) = 0 \\
+       u_{0}-u_{input} = 0
+       \end{cases}  & \underset{\sigma(Wu)=(A+\mathbb 1)u}{\rightarrow}  & \begin{cases}
+       u_{T}-(A\Delta t+\mathbb 1)u_{T-1} = 0  \\
+       u_{T-1}-(A\Delta t+\mathbb 1)u_{T-2} = 0 \\
       \vdots \\
-       x_{2}-(A\Delta t+\mathbb 1)x_{1} = 0\\
-       x_{1}-(A\Delta t+\mathbb 1)x_{0} = 0 \\
-       x_{0}-x_{input} = 0
+       u_{2}-(A\Delta t+\mathbb 1)u_{1} = 0\\
+       u_{1}-(A\Delta t+\mathbb 1)u_{0} = 0 \\
+       u_{0}-u_{input} = 0
        \end{cases} \\
 \end{array}
 </div>
@@ -650,19 +654,19 @@ If we employ a more widespread variant of NN, that employ skip connections, *Res
 <div>
 \begin{array}{lcms}
 \mbox{forward system}  &   \begin{cases}
-       x_{L} = \sigma(W_{L}x_{L-1})   \\
-       x_{L-1} = \sigma(W_{L-1}x_{L-2})  \\
+       u_{L} = \sigma(W_{L}u_{L-1})   \\
+       u_{L-1} = \sigma(W_{L-1}u_{L-2})  \\
       \vdots \\
-       x_{2} = \sigma(W_{2}x_{1}) \\
-       x_{1} = \sigma(W_{1}x_{0})  \\
-       x_{0} = x_{input}
+       u_{2} = \sigma(W_{2}u_{1}) \\
+       u_{1} = \sigma(W_{1}u_{0})  \\
+       u_{0} = u_{input}
        \end{cases}  & \underset{skip \quad connections}{\rightarrow}  & \begin{cases}
-        x_{L} = \sigma(W_{L}x_{L-1})+x_{L-1}   \\
-       x_{L-1} = \sigma(W_{L-1}x_{L-2})+x_{L-2}  \\
+        u_{L} = \sigma(W_{L}u_{L-1})+u_{L-1}   \\
+       u_{L-1} = \sigma(W_{L-1}u_{L-2})+u_{L-2}  \\
       \vdots \\
-       x_{2} = \sigma(W_{2}x_{1})+x_{1} \\
-       x_{1} = \sigma(W_{1}x_{0})\\
-       x_{0} = x_{input}
+       u_{2} = \sigma(W_{2}u_{1})+u_{1} \\
+       u_{1} = \sigma(W_{1}u_{0})\\
+       u_{0} = u_{input}
        \end{cases} \\
 \end{array}
 
@@ -671,12 +675,12 @@ If we employ a more widespread variant of NN, that employ skip connections, *Res
 
 Adding more layers to a resnet, with increansingly smaller steps, the network state evolution equation,
 \begin{equation}
-x_{t+1} = A(x_{t},\theta)+x_{t}
+u_{t+1} = A(u_{t},\theta)+u_{t}
 \end{equation}
 starts resembling an euler integration step.
 Taking this to the limit of small steps, we can parametrize the continuous dynamics of a neural network state by an ODE.
 \begin{equation}
-\dot{x} = A(x,\theta)
+\dot{u} = A(u,\theta)
 \end{equation}
 Now the gradients must be calculated using the continuous formulation of the adjoint method, and the forward and backward passes are calculated with regular ODE solvers.
 </div>
@@ -684,23 +688,23 @@ Now the gradients must be calculated using the continuous formulation of the adj
 <div>
 
 \begin{equation}
-J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{Data},x(t=T,p,x_{input}))\delta(T) dt
+J(u,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(u_{Data},u(t=T,p,u_{input}))\delta(T) dt
 \end{equation}
 
 
 
 \begin{array}{l}
- g(x,\dot{x},t,p) = \dot{x}-A(x,p,t) = 0 \\
- g_{0}(x_{input},p) = x(t = 0)-x_{input} = 0
+ g(u,\dot{u},t,p) = \dot{u}-A(u,p,t) = 0 \\
+ g_{0}(u_{input},p) = u(t = 0)-u_{input} = 0
  \end{array}
 
 
 
  \begin{array}{lc}
 \mbox{general backward/adjoint system} & \begin{cases}
-       \dot{\lambda(\tau)}\partial_{\dot{x}}g - \lambda(\tau)\dot{\partial_{\dot{x}}}g + \lambda(\tau)\partial_{x}g = -\partial_{x}f  \\
+       \dot{\lambda(\tau)}\partial_{\dot{u}}g - \lambda(\tau)\dot{\partial_{\dot{u}}}g + \lambda(\tau)\partial_{u}g = -\partial_{u}f  \\
      \lambda(\tau = 0) = 0 \\
-      \mu=\lambda\partial_{\dot{x}}g\partial_{x}g_{0}^{-1}
+      \mu=\lambda\partial_{\dot{u}}g\partial_{u}g_{0}^{-1}
    \end{cases} \\
 \end{array}
 
@@ -708,10 +712,10 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{Data},x(t=T,p,x_{input}))\delta(T) 
 
 \begin{cases}
 \partial_{\dot{x}}g =  \mathbb 1 \\
-\dot{\partial_{\dot{x}}g} = 0 \\
-\partial_{x}g = -\partial_{x}A \\
+\dot{\partial_{\dot{u}}g} = 0 \\
+\partial_{u}g = -\partial_{u}A \\
 \partial_{p}g = -\partial_{p}A \\
-\lambda(\tau = 0) = -\sum_{i}^{Ndata}\partial_{x}f \\
+\lambda(\tau = 0) = -\sum_{i}^{Ndata}\partial_{u}f \\
 \mu= 0
 \end{cases}
 
@@ -720,8 +724,8 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{Data},x(t=T,p,x_{input}))\delta(T) 
 
 \begin{array}{lc}
 \mbox{odenet backward/adjoint system} & \begin{cases}
-       \dot{\lambda(\tau)}  = - \lambda(\tau)\partial_{x}g   \\
-     \lambda(\tau = 0) = -\sum_{i}^{Ndata}\partial_{x}f
+       \dot{\lambda(\tau)}  = - \lambda(\tau)\partial_{u}g   \\
+     \lambda(\tau = 0) = -\sum_{i}^{Ndata}\partial_{u}f
    \end{cases} \\
 \end{array}
 
@@ -742,11 +746,11 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{{Ndata}}f(x_{Data},x(t=T,p,x_{input}))\delta(T) 
 
 ## Solving the Adjoint problem for "free" with automatic differentiation libraries
 
-Usually, if we are optimizing over a simulation or a neural network,  we won't have to formulate the adjoint system explicetily, it will be built automatically by the software once the forward pass has been defined, provided that all the operations in the forward pass are compatible with the automatic differentiation engine of the framework.
+Usually, if we are optimizing over a simulation or a neural network,  we won't have to formulate the adjoint systemexplicitly, it will be built automatically by the software once the forward pass has been defined, provided that all the operations in the forward pass are compatible with the automatic differentiation engine of the framework.
 
 One of the most basic operations that automatic differentiation  libraries implement is the *vector jacobian*, $$v^TW$$, product,  which allow us to backpropagate  the gradient of a scalar function backwards to the weights in the case of explicit layers (most NN use explicit layers).
 
-Most of these libraries nowadays have implemented the different variants of the adjoint system discussed here, even simulation frameworks such as *FeniCS*, implement the automatic calculation of the adjoint state, so we rarely have to care to implement it.
+Most of these libraries nowadays have implemented the different variants of the adjoint system discussed here, even simulation frameworks such as *FeniCS* or *Ansys*, implement the automatic calculation of the adjoint state, so we rarely have to care to implement it.
 
 Here I'll show an example of the solution of the forward and backward problem for the analytically solved linear system before, implementing a *Runge-Kutta* scheme in pytorch that we can think of as our *layer*,
 to compute the forward system.
@@ -846,7 +850,8 @@ J.backward()  #We slve the adjoint problem , the gradients are stored in the dif
 ```
 
 
-One data point start
+Fitting one data point at time $$T_{f}$$. The inner trajectory is the ground truth, the red arrow, the gradient of the loss function at $$T_{f}$$, is propagated back to calculate the gradient at
+every instant. The analytical expression for both systems was discussed in the *linear system* section.
 
 <div style="width:100%; min-width:250px; display: inline-block; vertical-align: top;text-align:center;">
 
@@ -857,7 +862,7 @@ One data point start
 
 </div>
 
-More than one data point
+More than one data point.
 
 <div style="width:100%; min-width:250px; display: inline-block; vertical-align: top;text-align:center;">
 
@@ -878,17 +883,17 @@ More than one data point
 
 <div>
 \begin{array}{lc}
-\underset{p}{\mbox{min}} & J(x,p) =  f(x,p)   \\
+\underset{p}{\mbox{min}} & J(u,p) =  f(u,p)   \\
 \end{array}
 \begin{array}{lc}
-\mbox{subject to} & g(x,p) = 0
+\mbox{subject to} & g(u,p) = 0
 \end{array}
 
 \begin{array}{l}
-\mbox{with } x\in\Re^{nx},p\in\Re^{np} \\
-g: \Re^{nx}\times\Re^{np}\rightarrow \Re^{nx} \\
-f: \Re^{nx}\times\Re^{np}\rightarrow \Re \\
-\mbox{being } \partial_{x}g \mbox{ non singular}
+\mbox{with } u\in\Re^{nu},p\in\Re^{np} \\
+g: \Re^{nu}\times\Re^{np}\rightarrow \Re^{nu} \\
+f: \Re^{nu}\times\Re^{np}\rightarrow \Re \\
+\mbox{being } \partial_{u}g \mbox{ non singular}
 \end{array}
 </div>
 
@@ -896,24 +901,24 @@ We are interested in finding the gradient $$d_{p}J$$. To that end we take deriva
 
 <div>
 \begin{array}{lc}
- d_{p}J =  \partial_{p}f^{T} +\partial_{x}f^{T}\partial_{p}x   \\
- \partial_{x}g\partial_{p}x=-\partial_{p}g
+ d_{p}J =  \partial_{p}f^{T} +\partial_{u}f^{T}\partial_{p}u   \\
+ \partial_{u}g\partial_{p}u=-\partial_{p}g
 \end{array}
 </div>
 
-Substituting $$\partial_{p}x$$ in $$d_{p}J$$, we arrive at
+Substituting $$\partial_{p}u$$ in $$d_{p}J$$, we arrive at
 
 
 
 \begin{array}{l}
- d_{p}J = \partial_{p}f^{T} -\partial_{x}f^{T}\partial_{x}g^{-1}\partial_{p}g  
+ d_{p}J = \partial_{p}f^{T} -\partial_{u}f^{T}\partial_{u}g^{-1}\partial_{p}g  
 \end{array}
 
 
-The thing is, $$\partial_{x}g^{-1}$$, appearing in $$d_{p}J$$ as the  product of $$\partial_{x}f^{T}\partial_{x}g^{-1}$$, makes it unnecesary to solve the larger system $$\partial_{x}g\partial_{p}x=-\partial_{p}g$$, we can instead find the vector $$\lambda^{T}\in\Re^{nx}$$ that satisfies $$\partial_{x}f^{T}\partial_{x}g^{-1}=\lambda^{T}$$, arriving at the adjoint system.
+The thing is, $$\partial_{u}g^{-1}$$, appearing in $$d_{p}J$$ as the  product of $$\partial_{u}f^{T}\partial_{u}g^{-1}$$, makes it unnecesary to solve the larger system $$\partial_{u}g\partial_{p}u=-\partial_{p}g$$, we can instead find the vector $$\lambda^{T}\in\Re^{nu}$$ that satisfies $$\partial_{u}f^{T}\partial_{u}g^{-1}=\lambda^{T}$$, arriving at the adjoint system.
 
 \begin{equation}
--\partial_{x}f^{T}\partial_{x}g^{-1}=\lambda^{T}\rightarrow \underset{adjoint \quad system}{\partial_{x}g^{T}\lambda = -\partial_{x}f}
+-\partial_{u}f^{T}\partial_{u}g^{-1}=\lambda^{T}\rightarrow \underset{adjoint \quad system}{\partial_{u}g^{T}\lambda = -\partial_{u}f}
 \end{equation}
 
 There is a more practical and general derivation of the adjoint method, that is through the use of lagrange multipliers. Let's start by building the augmented objective function by appending the constraint with lagrange multiplier $$\lambda^{T}$$. The important thing to realize here, is , because $$g(x,p)=0$$, $$\lambda^{T}$$ can take any value we want without altering the solution of the problem.
@@ -922,26 +927,26 @@ There is a more practical and general derivation of the adjoint method, that is 
 
 
 \begin{array}{lc}
-\underset{p}{\mbox{min}} & J_{aug}(x,p) = f(x,p) + \lambda^{T}g(x,p)  \\
+\underset{p}{\mbox{min}} & J_{aug}(u,p) = f(u,p) + \lambda^{T}g(u,p)  \\
 \end{array}
 
 
 
-Taking derivatives respect to the parameter $$p$$ of the augmented function, and getting common factor $$\partial_{p}x$$, we arrive at
+Taking derivatives respect to the parameter $$p$$ of the augmented function, and getting common factor $$\partial_{p}u$$, we arrive at
 
 \begin{equation}
-d_{p}J_{aug} = \partial_{p}f+\partial_{x}f\partial_{p}x+\lambda^{T}(\partial_{p}g+\partial_{x}g\partial_p{x})
+d_{p}J_{aug} = \partial_{p}f+\partial_{u}f\partial_{p}u+\lambda^{T}(\partial_{p}g+\partial_{u}g\partial_p{u})
 \end{equation}
 
 
 \begin{equation}
-d_{p}J_{aug} = \partial_{p}f +\lambda^{T}\partial_{p}{g} + (\partial_{x}f+\lambda^{T}\partial_{x}g)\partial_{p}x
+d_{p}J_{aug} = \partial_{p}f +\lambda^{T}\partial_{p}{g} + (\partial_{u}f+\lambda^{T}\partial_{u}g)\partial_{p}u
 \end{equation}
 
-Now, we exercise our freedom of choice for $$\lambda^{T}$$ and choose such, that cancels the $$\partial_{p}x$$ term, arriving againg to the adjoint equation.
+Now, we euercise our freedom of choice for $$\lambda^{T}$$ and choose such, that cancels the $$\partial_{p}u$$ term, arriving againg to the adjoint equation.
 
 \begin{equation}
-\partial_{x}g^{T}\lambda = -\partial_{x}f
+\partial_{u}g^{T}\lambda = -\partial_{u}f
 \end{equation}
 
 
@@ -956,18 +961,18 @@ Such as in the case of neural networks, and dynamical systems, we are specially 
 
 <div>
 \begin{array}{lc}
-\underset{p}{\mbox{minimize}} & J(x_{T},p)  \\
+\underset{p}{\mbox{minimize}} & J(u_{T},p)  \\
 \end{array}
 
 
 \begin{array}{lcm}
-\mbox{subject to} & g(x,p) = 0 = &   \begin{cases}
-      g(x_{T},x_{T-1},p) = 0  \\
-      g(x_{T-1},x_{T-2},p) = 0 \\
+\mbox{subject to} & g(u,p) = 0 = &   \begin{cases}
+      g(u_{T},u_{T-1},p) = 0  \\
+      g(u_{T-1},u_{T-2},p) = 0 \\
       \vdots \\
-      g(x_{2},x_{1},p) = 0\\
-      g(x_{1},x_{0},p) = 0 \\
-      g(x_{0},p) = 0
+      g(u_{2},u_{1},p) = 0\\
+      g(u_{1},u_{0},p) = 0 \\
+      g(u_{0},p) = 0
    \end{cases} \\
 \end{array}
 </div>
@@ -977,33 +982,33 @@ The derivation in the last section is still valid, in this case, but doesnt give
 
 
 \begin{equation}
-J_{aug}(x_{T},p) = J(x_{T},p) + \lambda_{T}g(x_{T},x_{T-1},p) + \lambda_{T-1}g(x_{T-1},x_{T-2},p) \ldots \lambda_{1}g(x_{1},x_{0},p)+ \lambda_{0}g(x_{0},p)
+J_{aug}(u_{T},p) = J(u_{T},p) + \lambda_{T}g(u_{T},u_{T-1},p) + \lambda_{T-1}g(u_{T-1},u_{T-2},p) \ldots \lambda_{1}g(u_{1},u_{0},p)+ \lambda_{0}g(u_{0},p)
 \end{equation}
 
 
-Let's again take derivatives respect to $$p$$. Our objective is to get rid of the $$d_{p}x_{Tk}$$ terms, so let's take common factor of each one of them
+Let's again take derivatives respect to $$p$$. Our objective is to get rid of the $$d_{p}u_{Tk}$$ terms, so let's take common factor of each one of them
 
 
 
 
 <div>
 \begin{eqnarray}
-d_{p} J_{aug} = \partial_{p} J + \partial_{x}J \partial_{p}x+
-\lambda_{T}(\partial_{x_{T}}g_{T}d_{p}x_{T} + \partial_{x_{T-1}}g_{T}d_{p}x_{T-1}+\partial_{p}g_{T})+ \\
-\lambda_{T-1}(\partial_{x_{T-1}}g_{T-1}d_{p}x_{T-1} + \partial_{x_{T-2}}g_{T-1}d_{p}x_{T-2}+\partial_{p}g_{T-1})+ \\
+d_{p} J_{aug} = \partial_{p} J + \partial_{u}J \partial_{p}u+
+\lambda_{T}(\partial_{u_{T}}g_{T}d_{p}u_{T} + \partial_{u_{T-1}}g_{T}d_{p}u_{T-1}+\partial_{p}g_{T})+ \\
+\lambda_{T-1}(\partial_{u_{T-1}}g_{T-1}d_{p}u_{T-1} + \partial_{u_{T-2}}g_{T-1}d_{p}u_{T-2}+\partial_{p}g_{T-1})+ \\
 \ldots \\
-\lambda_{1}(\partial_{x_{1}}g_{1}d_{p}x_{1} + \partial_{x_{0}}g_{1}d_{p}x_{0}+\partial_{p}g_{1})+
-\lambda_{0}(\partial_{x_{0}}g_{0}d_{p}x_{0} + \partial_{p}g_{0})
+\lambda_{1}(\partial_{u_{1}}g_{1}d_{p}u_{1} + \partial_{u_{0}}g_{1}d_{p}u_{0}+\partial_{p}g_{1})+
+\lambda_{0}(\partial_{u_{0}}g_{0}d_{p}u_{0} + \partial_{p}g_{0})
 \end{eqnarray}
 </div>
 
 <div>
 \begin{eqnarray}
 d_{p} J_{aug} = \partial_{p} J +
-(\partial_{x}J+\lambda_{T}\partial_{x_{T}}g_{T})d_{p}x_{T}+
-(\lambda_{T}\partial_{x_{T-1}}g_{T}+\lambda_{T-1}\partial_{x_{T-1}}g_{T-1})d_{p}x_{T-1} + \\
+(\partial_{u}J+\lambda_{T}\partial_{u_{T}}g_{T})d_{p}u_{T}+
+(\lambda_{T}\partial_{u_{T-1}}g_{T}+\lambda_{T-1}\partial_{u_{T-1}}g_{T-1})d_{p}u_{T-1} + \\
 \ldots \\
-(\lambda_{1}\partial_{x_{0}}g_{1}+\lambda_{0}\partial_{x_{0}}g_{0})d_{p}x_{0}+
+(\lambda_{1}\partial_{u_{0}}g_{1}+\lambda_{0}\partial_{u_{0}}g_{0})d_{p}u_{0}+
 \lambda_{T}\partial_{p}g_{T}+\lambda_{T-1}\partial_{p}g_{T-1}+\ldots +
 \lambda_{1}\partial_{p}g_{1}+
 \lambda_{0}\partial_{p}g_{0}
@@ -1020,10 +1025,10 @@ It is worth noting, that this is just a more formal reformulation of the algorit
 <div>
 \begin{array}{lm}
 \mbox{backward/adjoint system} & \begin{cases}
-        \partial_{x}J+\lambda_{T}\partial_{x_{T}}g_{T} = 0 \\
-        \lambda_{T}\partial_{x_{T-1}}g_{T}+\lambda_{T-1}\partial_{x_{T-1}}g_{T-1} =0 \\
+        \partial_{u}J+\lambda_{T}\partial_{u_{T}}g_{T} = 0 \\
+        \lambda_{T}\partial_{u_{T-1}}g_{T}+\lambda_{T-1}\partial_{u_{T-1}}g_{T-1} =0 \\
         \vdots \\
-        \lambda_{1}\partial_{x_{0}}g_{1}+\lambda_{0}\partial_{x_{0}}g_{0} = 0 \\
+        \lambda_{1}\partial_{u_{0}}g_{1}+\lambda_{0}\partial_{u_{0}}g_{0} = 0 \\
         \end{cases} \\
 \end{array}
 
@@ -1043,12 +1048,12 @@ It is worth noting, that this is just a more formal reformulation of the algorit
 
 \begin{array}{lm}
 \mbox{forward/state system} &   \begin{cases}
-      g(x_{T},x_{T-1},p) = 0  \\
-      g(x_{T-1},x_{T-2},p) = 0 \\
+      g(u_{T},u_{T-1},p) = 0  \\
+      g(u_{T-1},u_{T-2},p) = 0 \\
       \vdots \\
-      g(x_{2},x_{1},p) = 0\\
-      g(x_{1},x_{0},p) = 0 \\
-      g(x_{0},p) = 0
+      g(u_{2},u_{1},p) = 0\\
+      g(u_{1},u_{0},p) = 0 \\
+      g(u_{0},p) = 0
    \end{cases} \\
 \end{array}
 </div>
@@ -1060,15 +1065,15 @@ Now let's deal with the case where the state is a time dependent function, this 
 
 <div>
 \begin{array}{lc}
-\underset{p}{\mbox{minimize}} & J(x(t),p) = \int_{0}^{T} f(x(t),p) \,dt  \\
+\underset{p}{\mbox{minimize}} & J(u(t),p) = \int_{0}^{T} f(u(t),p) \,dt  \\
 \end{array}
 
 
 
 \begin{array}{lc}
 \mbox{subject to} & \begin{cases}
-      g(\dot{x},x,p) = 0  \\
-      g_{0}(x_{0},p) = 0
+      g(\dot{u},u,p) = 0  \\
+      g_{0}(u_{0},p) = 0
    \end{cases} \\
 \end{array}
 </div>
@@ -1077,49 +1082,49 @@ Let's build the augmented objective function by plugging the constraints with th
 
 
 \begin{equation}
- J_{aug} = \int_{0}^{T} f(x(t),p)+ \lambda(t)^{T}g(\dot{x},x,p) dt + \mu g_{0}(x_{0},p)
+ J_{aug} = \int_{0}^{T} f(u(t),p)+ \lambda(t)^{T}g(\dot{u},u,p) dt + \mu g_{0}(u_{0},p)
  \end{equation}
 
 
- We aim to calculate $d_{p}Jaug$, our goal is the same as before, take gradients respect to $p$, and try to get rid of $\partial_{p}x(t)$ by using the lagrange multipliers
+ We aim to calculate $d_{p}Jaug$, our goal is the same as before, take gradients respect to $p$, and try to get rid of $\partial_{p}u(t)$ by using the lagrange multipliers
 
 
 
  \begin{equation}
- d_{p}J_{aug} = \int_{0}^{T} \partial_{p}f+ \partial_{x}f\partial_{p}x  + \lambda(t)^{T}(\partial_{\dot{x}}g\underset{\partial_{x}\dot{x}\partial_{p}x=\dot{\partial_{p}x}}{\dot{\partial_{p}x}} +
- \partial_{x}g\partial_{p}x +\partial_{p}g)   dt +
- \mu (\partial_{x}g_{0}\partial_{p}x + \partial_{p}g_{0})\Bigr|_{t = 0}
+ d_{p}J_{aug} = \int_{0}^{T} \partial_{p}f+ \partial_{u}f\partial_{p}u  + \lambda(t)^{T}(\partial_{\dot{u}}g\underset{\partial_{u}\dot{u}\partial_{p}u=\dot{\partial_{p}u}}{\dot{\partial_{p}u}} +
+ \partial_{u}g\partial_{p}u +\partial_{p}g)   dt +
+ \mu (\partial_{u}g_{0}\partial_{p}u + \partial_{p}g_{0})\Bigr|_{t = 0}
  \end{equation}
 
 
 
 
- The mischevious term here is $$\int_{0}^{T} \lambda(t)\partial_{\dot{x}}g\dot{\partial_{p}x}$$, we need to have everything in terms of $$\partial_{p}x$$, not $$\dot{\partial_{p}x}$$, but because everything appears as inner products with $$\lambda$$, we can find the adjoint of the $$\frac{d}{dt}$$, in more amenable terms, we can integrate by parts to move the $$\frac{d}{dt}$$ to the left of the integral.
+ The mischevious term here is $$\int_{0}^{T} \lambda(t)\partial_{\dot{u}}g\dot{\partial_{p}u}$$, we need to have everything in terms of $$\partial_{p}u$$, not $$\dot{\partial_{p}u}$$, but because everything appears as inner products with $$\lambda$$, we can find the adjoint of the $$\frac{d}{dt}$$, in more amenable terms, we can integrate by parts to move the $$\frac{d}{dt}$$ to the left of the integral.
 
 <div>
 \begin{equation}
- d_{p}J_{aug} = \int_{0}^{T} \lambda(t)\partial_{\dot{x}}g\dot{\partial_{p}x} = \lambda\partial_{\dot{x}}g\partial_{p}{x}\Bigr|_{t=0}^{t=T}-\int_{0}^{T} \dot{\lambda\partial_{\dot{x}}}g\partial_{p}{x}
+ d_{p}J_{aug} = \int_{0}^{T} \lambda(t)\partial_{\dot{u}}g\dot{\partial_{p}u} = \lambda\partial_{\dot{u}}g\partial_{p}{u}\Bigr|_{t=0}^{t=T}-\int_{0}^{T} \dot{\lambda\partial_{\dot{u}}}g\partial_{p}{u}
  \end{equation}
 </div>
 
- We are free to choose the $$\lambda, \mu$$ terms, we do so by setting $$\lambda(T) = 0$$ to get rid of $$\dot{\partial_{p}{x}(T)}$$, and we arrange a similar solution in $$t=0$$ by seeking to make zero $$(\mu\partial_{x}g_{0}-\lambda\partial_{\dot{x}}g)\partial_{p}{x}(t=0)$$.
+ We are free to choose the $$\lambda, \mu$$ terms, we do so by setting $$\lambda(T) = 0$$ to get rid of $$\dot{\partial_{p}{u}(T)}$$, and we arrange a similar solution in $$t=0$$ by seeking to make zero $$(\mu\partial_{u}g_{0}-\lambda\partial_{\dot{u}}g)\partial_{p}{u}(t=0)$$.
 
 
 
 
 <div>
  \begin{equation}
- d_{p}J_{aug} = \int_{0}^{T} \partial_{p}f+ \partial_{x}f\partial_{p}x  + \lambda(t)(\partial_{\dot{x}}g{\dot{\partial_{p}x}} +
- \partial_{x}g\partial_{p}x +\partial_{p}g)   dt +
- \mu (\partial_{x}g_{0}\partial_{p}x + \partial_{p}g_{0})\Bigr|_{t = 0}
+ d_{p}J_{aug} = \int_{0}^{T} \partial_{p}f+ \partial_{u}f\partial_{p}u  + \lambda(t)(\partial_{\dot{u}}g{\dot{\partial_{p}u}} +
+ \partial_{u}g\partial_{p}u +\partial_{p}g)   dt +
+ \mu (\partial_{u}g_{0}\partial_{p}u + \partial_{p}g_{0})\Bigr|_{t = 0}
  \end{equation}
 
 
 
  \begin{equation}
- d_{p}J_{aug} = \int_{0}^{T} (\partial_{x}f - \dot{\lambda}\partial_{\dot{x}}g-\lambda\dot{\partial_{\dot{x}}}g+\lambda\partial_{x}g)\partial_{p}x
+ d_{p}J_{aug} = \int_{0}^{T} (\partial_{u}f - \dot{\lambda}\partial_{\dot{u}}g-\lambda\dot{\partial_{\dot{u}}}g+\lambda\partial_{u}g)\partial_{p}u
  +\partial_{p}f+\lambda\partial_{p}gdt
- + (\mu\partial_{x}g_{0}-\lambda\partial_{\dot{x}}g)\partial_{p}{x})\Bigr|_{t = 0} +\mu\partial_{p}g_{0}\Bigr|_{t = 0}
+ + (\mu\partial_{u}g_{0}-\lambda\partial_{\dot{u}}g)\partial_{p}{u})\Bigr|_{t = 0} +\mu\partial_{p}g_{0}\Bigr|_{t = 0}
  \end{equation}
 </div>
 
@@ -1127,13 +1132,13 @@ Let's build the augmented objective function by plugging the constraints with th
 <div>
  \begin{array}{lc}
  \mbox{forward/state system} & \begin{cases}
-       g(\dot{x},x,p) = 0  \\
-       g_{0}(x_{0},p) = 0
+       g(\dot{u},u,p) = 0  \\
+       g_{0}(u_{0},p) = 0
     \end{cases} \\
  \end{array}
 </div>
 
-By making zero the term that accompanies $$\partial_{p}x$$ in the integral, we arrive at the continuous adjoint system,
+By making zero the term that accompanies $$\partial_{p}u$$ in the integral, we arrive at the continuous adjoint system,
  we change time variables so the system is integrated backwards from $$\tau|_{T_{0}}$$.
 
 
@@ -1146,9 +1151,9 @@ By making zero the term that accompanies $$\partial_{p}x$$ in the integral, we a
 
 \begin{array}{lc}
 \mbox{backward/adjoint system} & \begin{cases}
-       \dot{\lambda(\tau)}\partial_{\dot{x}}g - \lambda(\tau)\dot{\partial_{\dot{x}}}g + \lambda(\tau)\partial_{x}g = -\partial_{x}f  \\
+       \dot{\lambda(\tau)}\partial_{\dot{u}}g - \lambda(\tau)\dot{\partial_{\dot{u}}}g + \lambda(\tau)\partial_{u}g = -\partial_{u}f  \\
      \lambda(\tau = 0) = 0 \\
-      \mu=\lambda\partial_{\dot{x}}g\partial_{x}g_{0}^{-1}
+      \mu=\lambda\partial_{\dot{u}}g\partial_{u}g_{0}^{-1}
    \end{cases} \\
 \end{array}
 
@@ -1169,24 +1174,24 @@ It is worth noting that discretizing this system, we arrive at the set of equati
 In the case of ODEnet or fitting a ODE to data, our cost function $$J$$ usually will be evaluated on discrete datapoints, that enter in the integral of the last section as *dirac deltas*, and appear in the RHS of
 the adjoint equation. When we have an ODE with $$\delta$$ as source terms, is like a sudden impulse that makes the solution of the ODE jump, presenting a discontinuity.
 
-To solve the adjoint system we'd have to solve seperatelly the sections between datapoints,adding  the *jump* at the end of a piece, then this will  act as the initial condition for the next piece.
+To solve the adjoint system we'd have to solve seperatelly the sections between datapoints,adding  the *jump* at the end of a piece, then this will  act as the initial condition for the neut piece.
 
 <div>
 \begin{equation}
-J(x,p) = \int_{0}^{T} \sum_{i}^{Ndata}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(t_{i}) dt
+J(u,p) = \int_{0}^{T} \sum_{i}^{Ndata}(u_{t_{i}}-\hat{u}(t_{i},p))^{2} \delta(t_{i}) dt
 \end{equation}
 
 \begin{equation}
-\partial_{x}f = -2\sum_{i}^{Ndata}(x_{t_{i}}-\hat{x}(t_{i},p)) \delta(t_{i})
+\partial_{u}f = -2\sum_{i}^{Ndata}(u_{t_{i}}-\hat{u}(t_{i},p)) \delta(t_{i})
 \end{equation}
 
 
 \begin{equation}
- \dot{\lambda}\partial_{\dot{x}}g -\lambda\dot{\partial_{\dot{x}}}g+\lambda\partial_{x}g = - \sum_{i}^{Ndata}A(x_{data},\hat{x})\delta(\tau_{i})
+ \dot{\lambda}\partial_{\dot{u}}g -\lambda\dot{\partial_{\dot{u}}}g+\lambda\partial_{u}g = - \sum_{i}^{Ndata}A(u_{data},\hat{u})\delta(\tau_{i})
 \end{equation}
 
 \begin{equation}
-\lambda(\tau_{i}^{+})-\lambda(\tau_{i}^{-}) = -A(x_{data},\hat{x}) = 2(x_{t_{i}}-\hat{x}(t_{i},p))
+\lambda(\tau_{i}^{+})-\lambda(\tau_{i}^{-}) = -A(u_{data},\hat{u}) = 2(u_{t_{i}}-\hat{u}(t_{i},p))
 \end{equation}
 </div>
 
@@ -1194,7 +1199,7 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{Ndata}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(t_
 
 
 
-<h2 id="footnotes">Footnotes</h2>
+<h2 id="footnotes">Footnotes and References</h2>
 
 <div class="footnotes" role="doc-endnotes">
   <ol>
@@ -1204,6 +1209,8 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{Ndata}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(t_
          <a href="https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf">https://cs.stanford.edu/~ambrad/adjoint_tutorial.pdf</a>
           </p>
       </li>
+
+
 
       <li id="fn:fn2" role="doc-endnote">
        <p> Brief, nice and practical explanation of the adjoint calculation for Function operators among many other things </p>
@@ -1222,9 +1229,17 @@ J(x,p) = \int_{0}^{T} \sum_{i}^{Ndata}(x_{t_{i}}-\hat{x}(t_{i},p))^{2} \delta(t_
       </li>
 
       <li id="fn:fn5" role="doc-endnote">
-      <p> Neat, great and extended explanation of this in the context of NN</p>
+      <p> Odenet paper</p>
         <p> Ricky T. Q. Chen, Yulia Rubanova, Jesse Bettencourt, David Duvenaud<a href="https://arxiv.org/abs/1806.07366"> Neural Ordinary Differential Equations</a><a href="#fnref:fn5" class="reversefootnote" role="doc-backlink">↩</a></p>
       </li>
+
+
+      <li>
+         <p> Notes on Adjoint Methods for 18.335 1 Introduction Steven G. Johnson
+         <a href="https://studylib.net/doc/10487773/notes-on-adjoint-methods-for-18.335-1-introduction-steven...">Notes Adjoint, Steven G. Johnson</a>
+          </p>
+      </li>
+
 
 
     </ol>

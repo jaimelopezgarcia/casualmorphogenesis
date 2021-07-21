@@ -8,16 +8,16 @@ permalink: /posts/dl4pdes_1/
 
 bib1_text: "LI, Zongyi, et al. Fourier neural operator for parametric partial differential equations. arXiv preprint arXiv:2010.08895, 2020."
 bib1_url: "https://arxiv.org/pdf/2010.08895.pdf?ref=mlnews"
-bib1_tag: "[1]"
+bib1_tag: "[Zongyi Li et al., 2020]"
 
 
 bib2_text: "Holl, Philipp, Vladlen Koltun, and Nils Thuerey. Learning to control pdes with differentiable physics. arXiv preprint arXiv:2001.07457 (2020)"
 bib2_url: "https://arxiv.org/abs/2001.07457"
-bib2_tag: "[2]"
+bib2_tag: "[7]"
 
 bib3_text: "Kim, Byungsoo, et al. Deep fluids: A generative network for parameterized fluid simulations. Computer Graphics Forum. Vol. 38. No. 2. 2019"
 bib3_url: "https://arxiv.org/abs/1806.02071"
-bib3_tag: "[3]"
+bib3_tag: "[8]"
 
 
 bib4_text: "Thuerey, Nils, et al. Deep learning methods for Reynolds-averaged Navier–Stokes simulations of airfoil flows. AIAA Journal 58.1 (2020): 25-36."
@@ -35,11 +35,11 @@ bib6_tag: "[6]"
 
 bib7_text: "Liu, Yuying, J. Nathan Kutz, and Steven L. Brunton. Hierarchical Deep Learning of Multiscale Differential Equation Time-Steppers. arXiv preprint arXiv:2008.09768 (2020)."
 bib7_url: "https://arxiv.org/abs/2008.09768"
-bib7_tag: "[7]"
+bib7_tag: "[Yuying Liu et al., 2020]"
 
 bib8_text: "Raissi, Maziar, Paris Perdikaris, and George Em Karniadakis. Multistep neural networks for data-driven discovery of nonlinear dynamical systems. arXiv preprint arXiv:1801.01236 (2018)."
 bib8_url: "https://arxiv.org/pdf/1801.01236.pdf"
-bib8_tag: "[8]"
+bib8_tag: "[Raissi et al., 2018]"
 
 bib9_text: "Bhattacharya, Kaushik, et al. Model reduction and neural networks for parametric pdes. arXiv preprint arXiv:2005.03180 (2020)."
 bib9_url: "https://arxiv.org/pdf/2005.03180.pdf"
@@ -52,9 +52,18 @@ In this post, I try to summarize the motivation and general idea  behind learnin
 results of applying  some of the latest advancements in the field  <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>, <a href = "{{page.bib1_url}}">{{page.bib1_tag}}</a> to learn the *spinal decomposition*  dynamics described by the $$2D$$ evolutive
 *Allen-Cahn* equation.
 
+$$
+\begin{array}{l}
+    \partial_{t}u-M(\Delta u -\frac{1}{\epsilon^{2}}(u^{2}-1)u) = 0 \\
+     u,\nabla u |_{\partial \Omega} \quad periodic \\
+     u(0,x,y) = u_{0}(x,y)\\
+     x,y\in[0,1]
+\end{array}
+$$
+
 All the code  can be found  <a href = "https://github.com/jaimelopezgarcia/seminar_DL4pdes">here</a>.
 
-## Why Deep Learning and PDEs
+## Why Deep Learning and PDEs?
 
 Partial differential equations  are one of the most concise and useful ways we have for  representing the rules that describe the behavior of a system.
 Once we find a PDE that model some phenomena, we have some sort of a set of *differential Conway's game of life* rules of the system. Modelling a system this way, we are not only able to compute possible evolutions and
@@ -69,10 +78,10 @@ $$ \frac{\partial u}{\partial t} -\sigma \Delta u  = f(x) $$
 <p> The heat equation, the hello world of PDEs </p>
 </div>
 
-What's the catch? Well, for real problems of certain size,  they are very expensive to solve, in fact, a big fraction of the world HPC resources are devoted to solve airfoil boundary layers,
+So, what's the catch? Well, for real problems of certain size,  they are very expensive to solve. In fact, a big fraction of the world HPC resources are devoted to solve airfoil boundary layers,
 making weather forecasts, solving Black-Scholes to predict the price of Dogecoin...
 
-So, we want to solve them more efficiently, but how does deep learning come in to play here?
+So, we want to solve them more efficiently. But how does deep learning come in to play here?
 
  To answer this, it is specially enlightening to discuss some basic classic approach to deal with a certain kind of PDEs
  amenable to analytical treatment, linear PDEs. We'll consider the specific example of the vibrations of a guitar string.
@@ -98,20 +107,19 @@ given by the elongation produced with our thumb, and $$0$$ initial velocity  bec
 </div>
 
 
-To solve numerically this equation we first have to discretize things. If we only mesh the space with some stencil we are left with a system of ODEs $$\dot{x}=f(x)$$ of the amplitude of the solution on that node.
+To solve numerically this equation we first have to discretize things. If we only mesh the space with some stencil we are left with a system of ODEs $$\dot{u}=f(u)$$ of the amplitude of the solution on that node.
 Instead of meshing the space, we can as well discretize the spatial part by expanding $$u$$ in some finite basis $$u = \sum a_{k}(t)\phi_{k}$$, with $$\phi_{k} \in\{\phi_{1}(x)...\phi_{n}(x)\}$$ $$u = \sum a_{k}(t)\phi_{k}$$, and we'd get another system of ODEs $$\dot{a}=f(a)$$ for the amplitude of the projection onto each basis function. The thing is, once we choose a finite representation of the space , we'll get a system of ordinary differential equations whose solution will be the amplitude of the coefficients of the different basis functions over time.
 Our goal now is to choose a finite basis $$\{\phi_{1}(x)...\phi_{n}(x)\}$$ such that  we can have a very good approximation of our system with the least amount of basis functions.
 
 
 For linear systems such as the wave equation we can find this basis analytically ,by applying separation of variables and finding the eigenmodes of the associated Sturm-Liouville equation.
-Each element of this basis will be an harmonic mode, and being and eigenmode, will be orthogonal to every other basis element.
+Each element of this basis will be an harmonic mode, and being an eigenmode, it will be orthogonal to every other basis element.
 
 \begin{equation}
 u(x,t) =\sum_{n} sin(n\pi x/L)(A_{n}cos(n \pi ct/L))
 \end{equation}
 
-The *idea* of optimal basis will eventually depend on our specific problem, but being the eigenmodes orthogonal to each other, each of the associated ODE comprising the system will be decoupled from the others,
-if we prefer to analyze  it from a probabilistic standpoint, the elements of this basis are uncorrelated, and can be thought as the principal components.
+The *idea* of optimal basis will eventually depend on our specific problem. As  the eigenmodes are orthogonal to each other, each of the associated ODE comprising the system will be decoupled from the others. If we prefer to analyze  it from a probabilistic standpoint, the elements of this basis are uncorrelated, and can be thought as the principal components.
 
 Now, the projection of the initial shape of the string onto this basis will determine the coefficients $$A_{n}$$, this is how much each harmonic is "stimulated", and this is going to  unambiguously specify the evolution of the system.
 
@@ -121,7 +129,7 @@ Now, the projection of the initial shape of the string onto this basis will dete
 
 </div>
 
-Keeping only the  harmonics with more energy , we are going to have a good approximation of the string dynamics, if we pluck the string here or there, with more or less strength, we might need a few extra modes to meet a certain accuracy requirement,  but in any case we can know the state of our system with way less parameters that if we worked on the original $$x_{i}$$ discretization.
+Keeping only the  harmonics with more energy , we are going to have a good approximation of the string dynamics, if we pluck the string here or there, with more or less strength, we might need a few extra modes to meet a certain accuracy requirement,  but in any case we can know the state of our system with way less parameters than if we worked on the original $$x_{i}$$ discretization.
 
 
 The key thing here is, the wave equation can  describe a vast amount of  behaviors in systems with different geometries or with much broader spectral responses,  but in our specific applications, we are going to be using just a tiny subset of the space of possible solutions, the wave equation is like a compilation of maps for every museum  of oscillatory phenomena ,
@@ -147,7 +155,7 @@ In the end, this was accomplished with  a linear transformation that we can find
 this term is going to mix and couple our beloved eigenmodes together, new modes, not considered in the truncated basis will be born from combinations of the original ones, this will be exacerbated the most present
 the effect of the non-linearity is.
 The  trajectories of non linear evolutive PDEs, wont live in a flat manifold being each dimension the amplitude over one of the elements of the basis,  there is no **superposition principle** so we can not   insert linear combinations of our basis $$A_{1}(t)\phi_1(x)+A_{2}\phi_2(x)$$ and expect them to be a solution of the PDE,  the trajectories of the non linear PDE will live in curved manifolds,
-with no general way of finding the non linear transformation that  takes us from our original space to this curved *latent* manifold <sup id="fnref:fn3"><a href="#fn:fn3" >3</a></sup>.
+with no general way of finding the non linear transformation that  takes us from our original space to this curved *latent* manifold <sup id="fnref:fn3"><a href="#fn:fn3" >3</a></sup><sup id="fnref:fn4"><a href="#fn:fn4" >, 4</a></sup>.
 
 Most likely,   the deep learning guy at the end of the room, being too busy trying to come with a strange name for his next paper, wasn't paying attention to any of this. But as soon
 as the key terms *manifold*, *representations*, *non linear transformation*, *unknown change of basis*, are scattered into the air, he'll be on the floor, uncontrollably convulsing with excitement.
@@ -267,7 +275,7 @@ Besides the reduction in computing time, there are other interesting application
 
 
         <p> There are a lot of applications in dynamical system theory and classical mechanics for example, where knowing the change of coordinates that transform our system into
-                           some "canonical system" might give us a lot of insight about them, conserved quantities, normal forms etc. </p>
+                           some "canonical system" might give us a lot of insight about them, such as  conserved quantities, normal forms etc. </p>
 
 
         <li>
@@ -275,7 +283,7 @@ Besides the reduction in computing time, there are other interesting application
 
             <div class="tooltip">
                 <a href="{{page.bib6_url}}">
-                      <b>Computer graphics</b>
+                      <b>Data assimilation</b>
                         <span class="tooltiptext">
                       <p> {{page.bib6_text}} </p>
 
@@ -341,12 +349,11 @@ Nice and extended explanation <a href="{{ page.bib9_url}}">here</a>.
 ### The approach
 The most obvious model to learn this mapping is a *Convolutional Neural Network*, because it exploits the coherence and translational invariance present in the solutions of PDEs.
 
-The problem is, remember how we were talking in the example of the wave equation of a basis set of functions $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$ to represent our solution?
-with the CNN approach, we'll learn a mapping between the discrete spaces where $$X$$ and $$Y$$ will be represented, but this mapping will be completely mesh dependent,
-what if we first project $$X$$ into a known basis of our choice  $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$, we learn the mapping there and project back to $$Y$$, so if the discrete representation of $$X$$ changes,
+One of the main issues  with this approach is the following. Remember how we were talking in the example of the wave equation of a basis set of functions $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$ to represent our solution?
+with the CNN approach, we'll learn a mapping between the discrete spaces where $$X$$ and $$Y$$ will be represented, but this mapping will be completely  dependent on the mesh used in our training data, what if we first project $$X$$ into a known basis of our choice  $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$, we learn the mapping there and project back to $$Y$$, so if the discrete representation of $$X$$ changes,
 by changing the resolution of the snapshots for instance, the error committed will only be the projection error onto  $$\{ \phi_{1}(x)...\phi_{n}(x) \}$$, that shouldn't be too great if  we use a robust basis and the discrete $$X$$ representation still contains enough information to characterize an univocal mapping.
 
- Not only that, we now that some basis, such as Fourier Series expansions, are very well suited to sparsely represent PDEs solutions, so it should be more appropriate  to  start from the frequency domain  rather than the  space of CNN transformations.
+ Not only that, we know that some basis, such as Fourier Series expansions, are very well suited to sparsely represent PDEs solutions, so it should be more appropriate  to  start from the frequency domain  rather than the  space of CNN transformations.
 
 This clever approach was introduced in , as a new neural network architecture, coined as **Neural operator**, in particular when the frequency representation space is used, **Fourier Neural Operator** or **FNO**.
 
@@ -371,7 +378,7 @@ If we work in a function space we'll minimize:
 
 $$ \underset{\theta}{argmin} \underset{x \sim \mu}{E}(Cost(\psi_{solver}(x)-\hat{\psi}(x,\theta))$$
 
-Both methods work with discrete data , but in the first case , we are learning directly a mapping  in $$R^{N_{grid}}$$ while in the second case we first project the data onto  a function space (Fourier Transform), we learn the mapping there and transform back to the discrete space.
+Both methods work with discrete data , but in the first case , we are learning directly a mapping  in $$R^{N_{grid}}$$ while in the second case we first project the data onto  a function space (Fourier Transform), we learn the mapping there and transform back to the discretized space.
 
 
 
@@ -384,7 +391,7 @@ $$
     \partial_{t}u-M(\Delta u -\frac{1}{\epsilon^{2}}(u^{2}-1)u) = 0 \\
      u,\nabla u |_{\partial \Omega} \quad periodic \\
      u(0,x,y) = u_{0}(x,y)\\
-     x,y\in[0,1]
+     x,y\in[0,1]\times[0,1]
 \end{array}
 $$
 
@@ -392,6 +399,8 @@ $$
   Gibs free energy vs phase            |  Initial condition, small fluctuations that trigger the decomposition
 :-------------------------:|:-------------------------:
 <img src="{{ "/assets" | relative_url }}/media/gibbs_potential.jpg" alt="drawing" />  |  <img src="{{ "/assets" | relative_url }}/media/noise.png" alt="drawing"  />
+
+In the above equation $$u$$ is the function that parametrize the phase of the system, with range $$(-1,1)$$<sup id="fnref:fn5"><a href="#fn:fn5" >5</a></sup>.
 
 Let's imagine an isolated bottle full of water, under certain P,T conditions below the critical temperature, both gas and liquid water will coexist, while thermodynamics give us the equilibrium states,
 the dynamics of how we go from one state to another, is modelled by reaction diffusion systems like the Allen Cahn equation.
@@ -409,7 +418,7 @@ We'll start with a random small perturbation around the 0 metastable state that 
 
 
 
-I find this a simple yet interesting test problem for various reasons. It is very easy to generate a diverse set of learning trajectories by just using white noise as the initial conditions. There is no chaotic behavior<sup id="fnref:fn1"><a href="#fn:fn2" >2</a></sup> yet we have great sensitivity to initial conditions.  It is a stiff problem, this means,  it exhibits multiple spatial and temporal timescales that must be solved simultaneously to accurately predict long term behavior.
+I find this a simple yet interesting test problem for various reasons. It is very easy to generate a diverse set of learning trajectories by just using white noise as the initial conditions. There is no chaotic behavior<sup id="fnref:fn1"><a href="#fn:fn2" >2</a></sup> yet we have great sensitivity to initial conditions.  The numerical integration of this equation constitutes a stiff problem, this means,  it exhibits multiple spatial and temporal timescales that must be solved simultaneously to accurately predict long term behavior.
 
 We have an extremely fast destabilization at the beginning, called *nucleation* that is followed by a slow evolution dictated by the interface between phases. Even if the coalescence stage is generally slow, when two drops are close to each other, they merge very quickly, a process that requires a small enough time step to be correctly captured.
 
@@ -446,14 +455,14 @@ which is needed besides, to enable  the network to implement boundary conditions
 ## Training and evaluation
 
 
-The mapping we'll try to learn is $$\Psi: u_{T-\Delta t}\rightarrow u_{T} $$ aiming to later apply it recurrently to predict times much longer than  $$\Delta t$$, such as in <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>. Because NNs operate in a different space than the original one, they'll not be constrained by the time integration errors of traditional schemes <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>, so larger prediction times can (and must) be used for long term prediction.
+The mapping we'll try to learn is $$\Psi: u_{T-\Delta t}\rightarrow u_{T} $$ aiming to later apply it recurrently to predict times much longer than  $$\Delta t$$, such as in <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>. As NNs operate in a different space than the original one, they'll not be constrained necessarily by the time integration errors of traditional schemes <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>, so larger prediction times can (and must) be used for long term prediction.
 
 The loss function to minimize, the same used in <a href = "{{page.bib1_url}}">{{page.bib1_tag}}</a> and <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a>, will be simply the square error of the prediction one step ahead and the ground truth snapshot.
 
 
 $$\underset{\theta}{argmin}\underset{u_{0},T}{E}(|u_{T+\Delta t}-\hat{u}_{T+\Delta t}(\theta, u_{T})|^{2})$$
 
-We compute with Fenics 200 simulations with different random initial conditions sampled from $$N(0,\sigma = 0.2)$$, we split them in a 140:60 training/validation dataset. For validation we skip the first steps so the initial noise is diffused and the emergence of patterns can be appreciated. An Implicit Euler Scheme was used to compute the solution,  the first steps of the spinal decomposition required a smaller time step of $$dt/10$$.
+We compute with Fenics 200 simulations with different random initial conditions sampled from $$N(0,\sigma = 0.2)$$, we split them in a 140:60 training/validation dataset. For validation we skip the first steps so the initial noise is diffused and the emergence of patterns can be appreciated. An Backward Euler scheme was used to compute the solution,  the first steps of the spinal decomposition required a smaller time step of $$dt/10$$.
 
 For training we use $$\Delta t =  6dt_{solver}$$.
 
@@ -478,7 +487,7 @@ when it successfully reproduced the validation trajectories.
 
 
 ### Errors evolution in time
-#### Comparison CNN FNO
+#### Comparison CNN vs FNO
 
 
 Even if the long term stability  of FNO was expected to be better than the CNN, both being trained up to the same error at the next time step prediction,
@@ -607,6 +616,63 @@ We can follow <a href = "{{page.bib7_url}}">{{page.bib7_tag}}</a> and combine bo
       <p> This has limits, of course, in chaotic systems,  if you exceed its <a href = "https://en.wikipedia.org/wiki/Lyapunov_time"><i>Lyapunov time </i></a>, there'll be a very small correlation, or no correlation at all, between \(u_{t}\) and \(u_{t+\Delta t}\)</p>
     </li>
 
+    <li id="fn:fn4" >
+      <p> For a more theoretical and traditional approach to this <i>latent manifold</i> thing, applied to dynamical systems, one of the key terms is  <a href = "https://en.wikipedia.org/wiki/Inertial_manifold"><i> Approximate inertial manifolds. </i></a></p>
+    </li>
+
+    <li id="fn:fn5" >
+      <p> The range chosen to represent both phases is arbitrary, and depends on the domain of the two-well potential function we choose.</p>
+    </li>
 
   </ol>
 </div>
+
+
+<h2 id="references">References</h2>
+<div class="footnotes" >
+  <ol>
+
+  <li>
+    <p> {{page.bib1_text}}<a href="{{page.bib1_url}}"> {{page.bib1_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib2_text}}<a href="{{page.bib2_url}}"> {{page.bib2_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib3_text}}<a href="{{page.bib3_url}}"> {{page.bib3_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib4_text}}<a href="{{page.bib4_url}}"> {{page.bib4_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib5_text}}<a href="{{page.bib5_url}}"> {{page.bib5_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib6_text}}<a href="{{page.bib6_url}}"> {{page.bib6_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib7_text}}<a href="{{page.bib7_url}}"> {{page.bib7_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib8_text}}<a href="{{page.bib8_url}}"> {{page.bib8_url}}</a> </p>
+  </li>
+
+  <li>
+    <p> {{page.bib9_text}}<a href="{{page.bib9_url}}"> {{page.bib9_url}}</a> </p>
+  </li>
+
+
+
+  </ol>
+</div>
+
+
+<h2 id="footnotes">Acknowledgements</h2>
+Among others, I'd like to thank Prashanth Nadukandi (a.k.a FEM Sandokan) for the thorough review of this post, and Ángel Rivero Jiménez for all the master classes on Phase-field models.
