@@ -20,6 +20,8 @@ So,  it might be hard to understand at first,  how all these different methods, 
 
 Having a background in physics and applied math, I first encountered the Adjoint Method in the context of Sensitivity Analysis, Inverse problems, Optimal control... as a *trick* to efficiently calculate gradients. Later when I delved a little into Deep Learning stuff, with things such as *Backpropagation*,*Reverse mode differentiation*...,  it took me more time that I'd like to admit to tie it all together with my previous knowledge. So I'd like to try to ease that journey to people that follow a similar path, by  motivating and formulating the adjoint method from the standpoint of Applied Mathematics, and  detailing later the specific applications in different domains, including Deep Learning, so they can be used as well as a *cheat sheet* for quick consulting.
 
+A sandbox colab enviroment is linked <a href = "https://colab.research.google.com/drive/103-jNLOJCQSieX0lgBxMqrhCH-QaHJk6">here</a>, to play around with some ideas explained in the post, code <a href = "https://github.com/jaimelopezgarcia/Adjoint_DL_DS">here</a>.
+
 
 
 
