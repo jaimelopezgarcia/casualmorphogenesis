@@ -15,7 +15,7 @@ I'll work over a synthetic dataset that aims to replicate the materials design p
 propose new candidates to test in the lab, so uncertainty estimation is an essential part of the solution. Similar problems are found as well in gene expression identification scenarios.
 
 
-<a href = "https://github.com/jaimelopezgarcia/BayesianSparse.git">Code</a> and <a href = "https://colab.research.google.com/drive/1rsqrwGHfgjcbN4wzbGBbuNbzysAwAjuW?usp=sharing"> Collab notebook ( only core and very slow)</a>.
+<a href = "https://github.com/jaimelopezgarcia/BayesianSparse.git">Code</a> and <a href = "https://colab.research.google.com/drive/1rsqrwGHfgjcbN4wzbGBbuNbzysAwAjuW?usp=sharing"> Collab notebook (very slow)</a>.
 
 
 # Introduction
@@ -331,7 +331,7 @@ Let's write down the basic model
 
 $$ c_{i} \sim Bernoulli(p_{inclusion}) $$
 $$ \beta \sim \mathcal{N}(0,\sigma(c_{i}))$$
-$$ \sigma_{y} \sim \mathcal{\chi^{2}}(N_{samples}-1)\sigma_{res}/(N_{samples}-1)\ $$
+$$ \sigma_{y}^{2} \sim \mathcal{\chi^{2}}\sigma_{res}^{2}/(N_{samples}-1)\ $$
 $$ y \sim \mathcal{N}(X\beta,\sigma_{y}) $$
 
 </div>
