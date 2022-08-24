@@ -16,7 +16,7 @@ permalink: /about/
 I am Jaime, a physicist with no special interest on juggling, and who thinks that Star Wars is the most overrated saga ever. It is the first thing a kid with adhd raised in an arcade would come up with, when asked about spatial mumbo jumbo.
 
 
-I see myself as an aspiring cybernetist. Don't ask me for a specific definition of that, I just move on hunchs. I know that I like to follow every direction that pulls me toward the intersection point of the lame Venn diagram below.
+I see myself as an aspiring cybernetist. Don't ask me for a specific definition of that, I just move on hunchs. I know that I like to follow every direction that pulls me towards the intersection point of the lame Venn diagram below.
 
 
 
